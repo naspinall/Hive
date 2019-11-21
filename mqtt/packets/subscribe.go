@@ -69,7 +69,7 @@ func (sp *SubscribePacket) EncodeTopics(b []byte) ([]byte, error) {
 	return b, nil
 }
 
-func (sp *SubscribePacket) EncodeSubscribePacket() ([]byte, error) {
+func (sp *SubscribePacket) Encode() ([]byte, error) {
 	var b []byte
 
 	// Packet identifier
@@ -92,7 +92,7 @@ func (sp *SubscribePacket) EncodeSubscribePacket() ([]byte, error) {
 	return sp.FixedHeader.PrependFixedHeader(b)
 }
 
-func (sp *SubAckPacket) EncodeSubAckPacket() ([]byte, error) {
+func (sp *SubAckPacket) Encode() ([]byte, error) {
 	var b []byte
 
 	b, err := sp.EncodePacketIdentifier(b)

@@ -18,3 +18,16 @@ func NewUnsubAckPacket(fh *FixedHeader, b []byte) (*UnsubAckPacket, error) {
 	}
 	return usap, nil
 }
+
+func (up *UnsubscribePacket) Encode() ([]byte, error) {
+	return up.Encode()
+}
+
+func (uap *UnsubAckPacket) Encode() ([]byte, error) {
+	var b []byte
+	b, err := uap.EncodePacketIdentifier(b)
+	if err != nil {
+		return nil, err
+	}
+	return uap.FixedHeader.PrependFixedHeader(b)
+}

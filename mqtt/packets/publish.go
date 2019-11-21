@@ -71,7 +71,7 @@ func (pp *PublishPacket) EncodePacketIdentifier(b []byte) ([]byte, error) {
 	return b, nil
 }
 
-func (pp *PublishPacket) EncodePublishPacket(b []byte) ([]byte, error) {
+func (pp *PublishPacket) Encode(b []byte) ([]byte, error) {
 	// Variable header starts with the topic name
 	b, err := pp.EncodeTopicName(b)
 	if err != nil {
@@ -93,7 +93,7 @@ func (pp *PublishPacket) EncodePublishPacket(b []byte) ([]byte, error) {
 	return append(fhb, b...), err
 }
 
-func (pa *PublishAcknowledgmentPacket) EncodePublishAcknowledgmentPacket(b []byte) ([]byte, error) {
+func (pa *PublishAcknowledgmentPacket) Encode(b []byte) ([]byte, error) {
 	b, err := pa.FixedHeader.EncodeFixedHeader()
 	if err != nil {
 		return nil, err

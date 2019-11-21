@@ -16,9 +16,6 @@ func NewPingResponsePacket(fh *FixedHeader) *PingResponsePacket {
 	return &PingResponsePacket{}
 }
 
-func (prp *PingRequestPacket) EncodePingRequestPacket() ([]byte, error) {
-	return prp.FixedHeader.EncodeFixedHeader()
-}
-func (prp *PingResponsePacket) EncodePingResponsePacket() ([]byte, error) {
+func (prp *PingRequestPacket) Encode() ([]byte, error) {
 	return prp.FixedHeader.EncodeFixedHeader()
 }

@@ -41,7 +41,7 @@ type ConnectPacket struct {
 	ClientID       string
 	Username       string
 	WillProperties *WillProperties
-	Password       string
+	Password       []byte
 	WillTopic      string
 	WillPayload    []byte
 }
@@ -156,27 +156,93 @@ func (cp *ConnectPacket) EncodeKeepAlive(b []byte) ([]byte, error) {
 
 func (cp *ConnectPacket) DecodePayload(b []byte, n int) error {
 
-	err := cp.DecodeClientID(b, n)
+	n, err := cp.DecodeClientID(b, n)
 	if err != nil {
 		return err
 	}
+	// If willflag is set to 1, fill topic is the next in the payload.
+	if cp.WillFlag {
+		n, err = cp.DecodeWillTopic(b, n)
+		if err != nil {
+			return err
+		}
+		n, err = cp.DecodeWillMessage(b, n)
+		if err != nil {
+			return err
+		}
+	}
+
+	// If Username is set, username and password are next in the payload.
+	if cp.UsernameFlag {
+		n, err = cp.DecodeUsername(b, n)
+		if err != nil {
+			return err
+		}
+		n, err = cp.DecodePassword(b, n)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
-func (cp *ConnectPacket) DecodeClientID(b []byte, n int) error {
+func (cp *ConnectPacket) DecodeWillTopic(b []byte, n int) (int, error) {
+	topic, m, err := DecodeString(b[n:])
+	if err != nil {
+		return -1, err
+	}
+	cp.WillTopic = topic
+	return m + n, nil
+
+}
+
+func (cp *ConnectPacket) DecodeWillMessage(b []byte, n int) (int, error) {
+
+	messageLength, m, err := DecodeTwoByteInt(b[n:])
+	n = n + m // Moving past the will message length.
+
+	cp.WillPayload, m, err = DecodeBinaryData(b[n : n+int(messageLength)])
+	if err != nil {
+		return -1, err
+	}
+	return n + m, nil
+}
+
+func (cp *ConnectPacket) DecodeUsername(b []byte, n int) (int, error) {
+	username, m, err := DecodeString(b[n:])
+	if err != nil {
+		return -1, err
+	}
+	cp.Username = username
+	return m + n, nil
+}
+
+func (cp *ConnectPacket) DecodePassword(b []byte, n int) (int, error) {
+	messageLength, m, err := DecodeTwoByteInt(b[n:])
+	n = n + m // Moving past the password length.
+
+	cp.Password, m, err = DecodeBinaryData(b[n : n+int(messageLength)])
+	if err != nil {
+		return -1, err
+	}
+	return n + m, nil
+}
+
+func (cp *ConnectPacket) DecodeClientID(b []byte, n int) (int, error) {
 	clientId, n, err := DecodeString(b[n:])
 	if err != nil {
-		return err
+		return -1, err
 	}
 	cp.ClientID = clientId
-	return nil
+	return n, nil
 }
 
 func (cp *ConnectPacket) EncodeClientID(b []byte) ([]byte, error) {
 	return EncodeString(b, cp.ClientID)
 }
 
-func (cp *ConnectPacket) EncodeConnectPacket() ([]byte, error) {
+func (cp *ConnectPacket) Encode() ([]byte, error) {
 	var b []byte
 
 	// Starting from the variable header, fixed header is last.
@@ -216,7 +282,7 @@ func (cp *ConnectPacket) EncodeConnectPacket() ([]byte, error) {
 	return append(fhb, b...), nil
 }
 
-func (cp *ConnackPacket) EncodeConnackPacket() ([]byte, error) {
+func (cp *ConnackPacket) Encode() ([]byte, error) {
 	//Connack is just the fixed header and the return code.
 	b, err := cp.FixedHeader.EncodeFixedHeader()
 	return append(b, cp.ReturnCode), err
