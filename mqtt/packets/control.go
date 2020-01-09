@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"log"
 )
 
@@ -27,6 +28,16 @@ const (
 	PINGRESP    = 13 //Ping Response
 	DISCONNECT  = 14 //Disconnect Notification
 	AUTH        = 15 //Authentication Exchange
+)
+
+// Connect Return Code Values
+const (
+	ConnectionAccepted          = 0x00 //Connection accepted
+	UnnaceptableProtocolVersion = 0x01 //The Server does not support the level of the MQTT protocol requested by the Client
+	IdentifierRejected          = 0x02 //The Client identifier is correct UTF-8 but not allowed by the Server
+	ServerUnavailable           = 0x03 //The Network Connection has been made but the MQTT service is unavailable
+	BadUsernameOrPassword       = 0x04 //The data in the user name or password is malformed
+	NotAuthorised               = 0x05 //The Client is not authorized to connect
 )
 
 type FixedHeaderFlags struct {
@@ -56,6 +67,7 @@ func NewFixedHeader(b []byte) (*FixedHeader, error) {
 		log.Fatal("Invalid control packet")
 	}
 	rl, _, err := DecodeVariableByteInteger(b[1:])
+
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +77,7 @@ func NewFixedHeader(b []byte) (*FixedHeader, error) {
 
 func (fh *FixedHeader) EncodeFixedHeader() ([]byte, error) {
 	b, err := fh.EncodeTypeAndFlags()
+	fmt.Println(fh.RemaningLength)
 	b, err = EncodeVariableByteInteger(b, fh.RemaningLength)
 	return b, err
 }
@@ -80,6 +93,7 @@ func (fh *FixedHeader) DecodeTypeAndFlags(b byte) error {
 
 func (fh *FixedHeader) EncodeTypeAndFlags() ([]byte, error) {
 	tf := byte(fh.Type) << 4
+	fmt.Println(tf)
 	if fh.Flags.Duplicate {
 		tf |= 0x08
 	}
@@ -87,7 +101,6 @@ func (fh *FixedHeader) EncodeTypeAndFlags() ([]byte, error) {
 	if fh.Flags.Retain {
 		tf |= 0x01
 	}
-
 	return []byte{tf}, nil
 }
 
@@ -120,12 +133,12 @@ func DecodeVariableByteInteger(b []byte) (int, int, error) {
 	m := 1
 	v := 0
 	n := 0
-	for eb := range b {
-		v += (eb & 0x7F) * m
+	for _, eb := range b {
+		v += (int(eb) & 0x7F) * m
+		m *= 128
 		if m > 128*128*128 {
 			return -1, 0, errors.New("Malformed byte")
 		}
-		m *= 128
 		n++
 		if eb&0x80 == 0 {
 			break
@@ -149,6 +162,7 @@ func DecodeTwoByteInt(b []byte) (uint16, int, error) {
 
 func DecodeString(b []byte) (string, int, error) {
 	length, _, err := DecodeTwoByteInt(b)
+
 	if err != nil {
 		return "", 0, err
 	}
@@ -188,7 +202,7 @@ func EncodeVariableByteInteger(b []byte, x int) ([]byte, error) {
 		if x > 0 {
 			eb = eb | 128
 		}
-		vbi = append(b, eb)
+		vbi = append(vbi, eb)
 		if x == 0 {
 			break
 		}

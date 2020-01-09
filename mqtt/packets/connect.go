@@ -47,8 +47,9 @@ type ConnectPacket struct {
 }
 
 type ConnackPacket struct {
-	FixedHeader *FixedHeader
-	ReturnCode  byte
+	FixedHeader    *FixedHeader
+	SessionPresent byte
+	ReturnCode     byte
 }
 
 func NewConnackPacket(b []byte) (*ConnackPacket, error) {
@@ -63,11 +64,11 @@ func NewConnackPacket(b []byte) (*ConnackPacket, error) {
 
 func NewConnectPacket(fh *FixedHeader, b []byte) (*ConnectPacket, error) {
 	cp := &ConnectPacket{FixedHeader: fh}
-	n, err := cp.DecodeProtocolName(b, 2)
+	n, err := cp.DecodeProtocolVersion(b, 0)
 	if err != nil {
 		return nil, err
 	}
-	n, err = cp.DecodeProtocolVersion(b, n)
+	n, err = cp.DecodeProtocolName(b, n)
 	if err != nil {
 		return nil, err
 	}
@@ -285,5 +286,6 @@ func (cp *ConnectPacket) Encode() ([]byte, error) {
 func (cp *ConnackPacket) Encode() ([]byte, error) {
 	//Connack is just the fixed header and the return code.
 	b, err := cp.FixedHeader.EncodeFixedHeader()
+	b = append(b, cp.SessionPresent)
 	return append(b, cp.ReturnCode), err
 }
