@@ -1,21 +1,31 @@
 package packets
 
-type PingRequestPacket struct {
+type PingPacket struct {
 	FixedHeader *FixedHeader
 }
 
-type PingResponsePacket struct {
-	PingRequestPacket
+func NewPingPacket(fh *FixedHeader) *PingPacket {
+	return &PingPacket{FixedHeader: fh}
 }
 
-func NewPingRequestPacket(fh *FixedHeader) *PingRequestPacket {
-	return &PingRequestPacket{FixedHeader: fh}
-}
-
-func NewPingResponsePacket(fh *FixedHeader) *PingResponsePacket {
-	return &PingResponsePacket{}
-}
-
-func (prp *PingRequestPacket) Encode() ([]byte, error) {
+func (prp PingPacket) Encode() ([]byte, error) {
 	return prp.FixedHeader.EncodeFixedHeader()
+}
+
+func PingRequest() *PingPacket {
+	return &PingPacket{
+		FixedHeader: &FixedHeader{
+			Type:           12,
+			RemaningLength: 0,
+		},
+	}
+}
+
+func PingResponse() *PingPacket {
+	return &PingPacket{
+		FixedHeader: &FixedHeader{
+			Type:           13,
+			RemaningLength: 0,
+		},
+	}
 }

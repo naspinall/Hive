@@ -31,8 +31,8 @@ func NewSubAckPacket(fh *FixedHeader, b []byte) (*SubAckPacket, error) {
 }
 
 func NewSubscribePacket(fh *FixedHeader, b []byte) (*SubscribePacket, error) {
-	sp := &SubscribePacket{}
-	n, err := sp.DecodePacketIdentifier(b, 2)
+	sp := &SubscribePacket{FixedHeader: fh}
+	n, err := sp.DecodePacketIdentifier(b, 0)
 	if err = sp.DecodeTopics(b, n); err != nil {
 		return nil, err
 	}
@@ -41,15 +41,16 @@ func NewSubscribePacket(fh *FixedHeader, b []byte) (*SubscribePacket, error) {
 
 func (sp *SubscribePacket) DecodeTopics(b []byte, n int) (err error) {
 	for n < int(sp.FixedHeader.RemaningLength) {
-		topic, n, err := DecodeString(b[n:])
+		topic, sl, err := DecodeString(b[n:])
 		if err != nil {
 			return err
 		}
-		qos, n, err := DecodeByte(b[n:])
+		qos, _, err := DecodeByte(b[n:])
 		sp.Topics = append(sp.Topics, Topic{
 			Topic: topic,
 			QoS:   qos,
 		})
+		n += sl + 1
 	}
 
 	return nil

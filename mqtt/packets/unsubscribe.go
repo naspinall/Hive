@@ -1,8 +1,5 @@
 package packets
 
-type UnsubscribePacket struct {
-	SubscribePacket
-}
 type UnsubAckPacket struct {
 	FixedHeader *FixedHeader
 	PacketIdentifier
@@ -17,10 +14,6 @@ func NewUnsubAckPacket(fh *FixedHeader, b []byte) (*UnsubAckPacket, error) {
 		return nil, err
 	}
 	return usap, nil
-}
-
-func (up *UnsubscribePacket) Encode() ([]byte, error) {
-	return up.Encode()
 }
 
 func (uap *UnsubAckPacket) Encode() ([]byte, error) {

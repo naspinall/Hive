@@ -61,39 +61,40 @@ type StringPair struct {
 	value string
 }
 
-func NewFixedHeader(b []byte) (*FixedHeader, error) {
+func NewFixedHeader(b []byte) (*FixedHeader, []byte, error) {
 	fh := &FixedHeader{}
 	if err := fh.DecodeTypeAndFlags(b[0]); err != nil {
 		log.Fatal("Invalid control packet")
 	}
-	rl, _, err := DecodeVariableByteInteger(b[1:])
+	rl, n, err := DecodeVariableByteInteger(b[1:])
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	fh.RemaningLength = rl
-	return fh, nil
+	return fh, b[n+1:], nil
 }
 
 func (fh *FixedHeader) EncodeFixedHeader() ([]byte, error) {
 	b, err := fh.EncodeTypeAndFlags()
-	fmt.Println(fh.RemaningLength)
+
 	b, err = EncodeVariableByteInteger(b, fh.RemaningLength)
 	return b, err
 }
 
 func (fh *FixedHeader) DecodeTypeAndFlags(b byte) error {
+	fmt.Println(b)
 	fh.Type = b >> 4
 	fh.Flags = FixedHeaderFlags{}
 	fh.Flags.Duplicate = (b >> 3 & 0x01) > 0
-	fh.Flags.QoS = uint8(b >> 2 & 0x03)
+	fh.Flags.QoS = uint8(b >> 1 & 0x03)
 	fh.Flags.Retain = b&0x01 > 0
 	return nil
 }
 
 func (fh *FixedHeader) EncodeTypeAndFlags() ([]byte, error) {
 	tf := byte(fh.Type) << 4
-	fmt.Println(tf)
+
 	if fh.Flags.Duplicate {
 		tf |= 0x08
 	}

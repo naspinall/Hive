@@ -1,5 +1,7 @@
 package packets
 
+import "fmt"
+
 type PublishPacket struct {
 	FixedHeader      *FixedHeader
 	TopicName        string
@@ -7,28 +9,20 @@ type PublishPacket struct {
 	Payload          []byte
 }
 
-type PublishAcknowledgmentPacket struct {
+type PublishQoSPacket struct {
 	FixedHeader *FixedHeader
 	PacketIdentifier
 }
 
-type PublishRecievedPacket struct {
-	PublishAcknowledgmentPacket
-}
-
-type PublishCompletePacket struct {
-	PublishAcknowledgmentPacket
-}
-
-func NewPublishAcknowledgmentPacket(fh *FixedHeader, b []byte) (*PublishAcknowledgmentPacket, error) {
-	pap := &PublishAcknowledgmentPacket{
+func NewPublishQoSPacket(fh *FixedHeader, b []byte) (*PublishQoSPacket, error) {
+	pqp := &PublishQoSPacket{
 		FixedHeader: fh,
 	}
-	_, err := pap.DecodePacketIdentifier(b, 2)
+	_, err := pqp.DecodePacketIdentifier(b, 2)
 	if err != nil {
 		return nil, err
 	}
-	return pap, nil
+	return pqp, nil
 }
 
 func NewPublishPacket(fh *FixedHeader, b []byte) (*PublishPacket, error) {
@@ -43,8 +37,9 @@ func NewPublishPacket(fh *FixedHeader, b []byte) (*PublishPacket, error) {
 	if err != nil {
 		return nil, err
 	}
-	payLength := n - int(pp.FixedHeader.RemaningLength) - 1
-	pp.Payload = (b[n:payLength])
+	pqyLength := int(pp.FixedHeader.RemaningLength) - n - 1
+	fmt.Println(pqyLength)
+	pp.Payload = (b[n:pqyLength])
 	return pp, nil
 }
 
@@ -93,10 +88,49 @@ func (pp *PublishPacket) Encode(b []byte) ([]byte, error) {
 	return append(fhb, b...), err
 }
 
-func (pa *PublishAcknowledgmentPacket) Encode(b []byte) ([]byte, error) {
-	b, err := pa.FixedHeader.EncodeFixedHeader()
+func (pq *PublishQoSPacket) Encode(b []byte) ([]byte, error) {
+	b, err := pq.FixedHeader.EncodeFixedHeader()
 	if err != nil {
 		return nil, err
 	}
-	return pa.EncodePacketIdentifier(b)
+	return pq.EncodePacketIdentifier(b)
+}
+
+func Acknowledge(i uint16) *PublishQoSPacket {
+	return &PublishQoSPacket{
+		FixedHeader: &FixedHeader{
+			Type:           4,
+			RemaningLength: 2,
+		},
+		// This is a bit ridiculous
+		PacketIdentifier: PacketIdentifier{
+			PacketIdentifier: i,
+		},
+	}
+}
+
+func Received(i uint16) *PublishQoSPacket {
+	return &PublishQoSPacket{
+		FixedHeader: &FixedHeader{
+			Type:           5,
+			RemaningLength: 2,
+		},
+		// This is a bit ridiculous
+		PacketIdentifier: PacketIdentifier{
+			PacketIdentifier: i,
+		},
+	}
+}
+
+func Complete(i uint16) *PublishQoSPacket {
+	return &PublishQoSPacket{
+		FixedHeader: &FixedHeader{
+			Type:           6,
+			RemaningLength: 2,
+		},
+		// This is a bit ridiculous
+		PacketIdentifier: PacketIdentifier{
+			PacketIdentifier: i,
+		},
+	}
 }
