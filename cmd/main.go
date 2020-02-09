@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/naspinall/Hive/controllers"
-	"github.com/naspinall/Hive/models"
+	"github.com/naspinall/Hive/pkg/controllers"
+	"github.com/naspinall/Hive/pkg/models"
 )
 
 const (
@@ -58,6 +58,6 @@ func main() {
 	r.HandleFunc("/alarm/{id}/", alarmsC.Get).Methods("GET")
 
 	//Roles CRUD
-
+	log.Println("Listening on port 3000")
 	http.ListenAndServe(":3000", r)
 }

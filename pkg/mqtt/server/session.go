@@ -2,7 +2,7 @@ package server
 
 import (
 	"github.com/jinzhu/gorm"
-	"github.com/naspinall/Hive/models"
+	"github.com/naspinall/Hive/pkg/models"
 )
 
 type SessionService interface {

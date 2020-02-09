@@ -6,63 +6,61 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-
-	"github.com/naspinall/Hive/models"
+	"github.com/naspinall/Hive/pkg/models"
 )
 
-type Devices struct {
-	ds models.DeviceService
+type Users struct {
+	us models.UserService
 }
 
-func NewDevices(ds models.DeviceService) *Devices {
-
-	return &Devices{
-		ds: ds,
+func NewUsers(us models.UserService) *Users {
+	return &Users{
+		us: us,
 	}
 }
 
-func (d *Devices) Create(w http.ResponseWriter, r *http.Request) {
-	var device models.Device
-	err := json.NewDecoder(r.Body).Decode(&device)
+func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
+	var user models.User
+	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	if err := d.ds.Create(&device); err != nil {
+	if err := u.us.Create(&user); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	err = json.NewEncoder(w).Encode(&device)
+	err = json.NewEncoder(w).Encode(&user)
 }
 
-func (d *Devices) Delete(w http.ResponseWriter, r *http.Request) {
+func (u *Users) Delete(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	if err := d.ds.Delete(uint(id)); err != nil {
+	if err := u.us.Delete(uint(id)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	w.WriteHeader(http.StatusNoContent)
 
 }
-func (d *Devices) Get(w http.ResponseWriter, r *http.Request) {
+func (u *Users) Get(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	device, err := d.ds.ByID(uint(id))
+	user, err := u.us.ByID(uint(id))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(&device)
+	err = json.NewEncoder(w).Encode(&user)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
