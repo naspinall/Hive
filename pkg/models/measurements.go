@@ -1,7 +1,10 @@
 package models
 
 import (
-	"fmt"
+	"bytes"
+	"encoding/json"
+	"log"
+	"net/http"
 
 	"github.com/jinzhu/gorm"
 )
@@ -44,7 +47,6 @@ func (mg *measurementGorm) ByDevice(id uint) ([]Measurement, error) {
 	if err := mg.db.Model(&device).Related(&measurements).Error; err != nil {
 		return nil, err
 	}
-	fmt.Print(measurements)
 	return measurements, nil
 }
 
@@ -58,7 +60,12 @@ func (mg *measurementGorm) ByID(id uint) (*Measurement, error) {
 }
 
 func (mg *measurementGorm) Create(measurement *Measurement) error {
-	return mg.db.Create(measurement).Error
+	err := mg.db.Create(measurement).Error
+	if err != nil {
+		return err
+	}
+	mg.Callback(measurement)
+	return nil
 }
 
 func (mg *measurementGorm) Update(measurement *Measurement) error {
@@ -67,4 +74,30 @@ func (mg *measurementGorm) Update(measurement *Measurement) error {
 func (mg *measurementGorm) Delete(id uint) error {
 	measurement := Measurement{Model: gorm.Model{ID: id}}
 	return mg.db.Delete(measurement).Error
+}
+
+func (mg *measurementGorm) Callback(m *Measurement) {
+	var subscriptions []*Subscription
+	device := Device{Model: gorm.Model{ID: uint(m.DeviceID)}}
+
+	err := mg.db.Model(&device).Related(&subscriptions).Error
+	if err != nil {
+		log.Println("Cannot Load Subscriptions")
+	}
+
+	for _, subscription := range subscriptions {
+
+		b, err := json.Marshal(m)
+		if err != nil {
+			log.Println("Invalid Callback Measurement JSON")
+		}
+
+		resp, err := http.Post(subscription.Url, "application/json", bytes.NewBuffer(b))
+		if err != nil {
+			log.Println(err)
+		}
+
+		log.Printf("Webhook successful for %s, with status %d", subscription.Url, resp.StatusCode)
+
+	}
 }

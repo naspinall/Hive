@@ -29,6 +29,7 @@ type AlarmDB interface {
 	Create(alarm *Alarm) error
 	Update(alarm *Alarm) error
 	Delete(id uint) error
+	Many(count int) ([]*Alarm, error)
 }
 
 func NewAlarmService(db *gorm.DB) AlarmService {
@@ -55,6 +56,15 @@ func (ag *alarmGorm) ByID(id uint) (*Alarm, error) {
 	}
 
 	return &alarm, nil
+}
+
+func (ag *alarmGorm) Many(count int) ([]*Alarm, error) {
+
+	var alarms []*Alarm
+	if err := ag.db.Limit(count).Find(&alarms).Error; err != nil {
+		return nil, err
+	}
+	return alarms, nil
 }
 
 func (ag *alarmGorm) Create(alarm *Alarm) error {

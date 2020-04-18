@@ -89,3 +89,23 @@ func (a *Alarms) GetByDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
+
+func (a *Alarms) GetMany(w http.ResponseWriter, r *http.Request) {
+	var err error
+	var count int64 = 100
+	q := r.URL.Query()
+	cq, ok := q["count"]
+	if ok {
+		count, err = strconv.ParseInt(cq[0], 10, 64)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+	}
+	alarms, err := a.as.Many(int(count))
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(&alarms)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}

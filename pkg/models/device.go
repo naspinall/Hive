@@ -9,7 +9,10 @@ import (
 
 type Device struct {
 	gorm.Model
-	Name string `gorm:"not null;unique_index,json:"name"`
+	Name      string  `gorm:"not null;unique_index" json:"name"`
+	IMEI      string  `json:"imei"`
+	Longitude float64 `json:"longitude"`
+	Latitude  float64 `json:"latitude"`
 }
 
 type deviceGorm struct {
@@ -30,6 +33,8 @@ type DeviceDB interface {
 	Create(device *Device) error
 	Update(device *Device) error
 	Delete(id uint) error
+	Many(count int) ([]*Device, error)
+	SearchByName(name string) ([]*Device, error)
 }
 
 type DeviceMultiplexer struct {
@@ -94,6 +99,16 @@ func NewDeviceService(db *gorm.DB) DeviceService {
 }
 
 //Getters
+func (dg *deviceGorm) Many(count int) ([]*Device, error) {
+	var devices []*Device
+
+	err := dg.db.Limit(count).Find(&devices).Error
+	if err != nil {
+		return nil, err
+	}
+	return devices, nil
+}
+
 func (dg *deviceGorm) ByName(name string) (*Device, error) {
 
 	var device Device
@@ -115,6 +130,14 @@ func (dg *deviceGorm) ByID(id uint) (*Device, error) {
 	}
 
 	return &device, nil
+}
+
+func (dg *deviceGorm) SearchByName(name string) ([]*Device, error) {
+	var devices []*Device
+	if err := dg.db.Where("name LIKE ?", "%"+name+"%").Find(&devices).Error; err != nil {
+		return nil, err
+	}
+	return devices, nil
 }
 
 //Mutators

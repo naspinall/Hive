@@ -68,3 +68,46 @@ func (d *Devices) Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
+
+func (d *Devices) GetMany(w http.ResponseWriter, r *http.Request) {
+	var err error
+	var count int64 = 100
+	q := r.URL.Query()
+	cq, ok := q["count"]
+	if ok {
+		count, err = strconv.ParseInt(cq[0], 10, 64)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+	}
+	devices, err := d.ds.Many(int(count))
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(&devices)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (d *Devices) GetByName(w http.ResponseWriter, r *http.Request) {
+	var name string
+	q := r.URL.Query()
+	cq, ok := q["name"]
+	if ok {
+		name = cq[0]
+	}
+	if ok != true {
+		http.Error(w, "Name required for search", http.StatusBadRequest)
+	}
+
+	devices, err := d.ds.SearchByName(name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(&devices)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}

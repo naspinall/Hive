@@ -6,11 +6,12 @@ import (
 )
 
 type Services struct {
-	Alarm       AlarmService
-	Device      DeviceService
-	Measurement MeasurementService
-	User        UserService
-	db          *gorm.DB
+	Alarm        AlarmService
+	Device       DeviceService
+	Measurement  MeasurementService
+	User         UserService
+	Subscription SubscriptionService
+	db           *gorm.DB
 }
 
 func NewServices(connectionString string) (*Services, error) {
@@ -18,18 +19,20 @@ func NewServices(connectionString string) (*Services, error) {
 	if err != nil {
 		return nil, err
 	}
+	db.LogMode(true)
 
 	return &Services{
-		Alarm:       NewAlarmService(db),
-		Device:      NewDeviceService(db),
-		Measurement: NewMeasurementService(db),
-		User:        NewUserService(db),
-		db:          db,
+		Alarm:        NewAlarmService(db),
+		Device:       NewDeviceService(db),
+		Measurement:  NewMeasurementService(db),
+		User:         NewUserService(db),
+		Subscription: NewSubscriptionService(db),
+		db:           db,
 	}, nil
 }
 
 func (s *Services) AutoMigrate() error {
-	return s.db.AutoMigrate(&User{}, &Alarm{}, &Measurement{}, &Device{}).Error
+	return s.db.AutoMigrate(&User{}, &Alarm{}, &Measurement{}, &Device{}, &Subscription{}).Error
 }
 
 func (s *Services) DestructiveReset() error {

@@ -32,32 +32,42 @@ func main() {
 	devicesC := controllers.NewDevices(services.Device)
 	measurementsC := controllers.NewMeasurements(services.Measurement)
 	alarmsC := controllers.NewAlarms(services.Alarm)
+	subscriptionsC := controllers.NewSubscriptions(services.Subscription)
 
 	r := mux.NewRouter()
+	s := r.PathPrefix("/api").Subrouter()
 
 	//Device CRUD
-	r.HandleFunc("/device", devicesC.Create).Methods("POST")
-	r.HandleFunc("/device/{id}/", devicesC.Delete).Methods("DELETE")
-	r.HandleFunc("/device/{id}/", devicesC.Get).Methods("GET")
+	s.HandleFunc("/devices", devicesC.GetMany).Methods("GET")
+	s.HandleFunc("/devices", devicesC.Create).Methods("POST")
+	s.HandleFunc("/devices/{id}/", devicesC.Delete).Methods("DELETE")
+	s.HandleFunc("/devices/{id}", devicesC.Get).Methods("GET")
 
 	//User CRUD
-	r.HandleFunc("/user", usersC.Create).Methods("POST")
-	r.HandleFunc("/user/{id}/", usersC.Delete).Methods("DELETE")
-	r.HandleFunc("/user/{id}/", usersC.Get).Methods("GET")
+	s.HandleFunc("/users", usersC.Create).Methods("POST")
+	s.HandleFunc("/users/{id}/", usersC.Delete).Methods("DELETE")
+	s.HandleFunc("/users/{id}/", usersC.Get).Methods("GET")
 
 	//Measurement CRUD
-	r.HandleFunc("/device/{id}/measurement", measurementsC.Create).Methods("POST")
-	r.HandleFunc("/device/{id}/measurement", measurementsC.GetByDevice).Methods("GET")
-	r.HandleFunc("/measurement/{id}/", measurementsC.Delete).Methods("DELETE")
-	r.HandleFunc("/measurement/{id}/", measurementsC.Get).Methods("GET")
+	s.HandleFunc("/devices/{id}/measurements", measurementsC.Create).Methods("POST")
+	s.HandleFunc("/devices/{id}/measurements", measurementsC.GetByDevice).Methods("GET")
+	s.HandleFunc("/measurements/{id}/", measurementsC.Delete).Methods("DELETE")
+	s.HandleFunc("/measurements/{id}/", measurementsC.Get).Methods("GET")
 
 	//Alarm CRUD
-	r.HandleFunc("/device/{id}/alarm", alarmsC.Create).Methods("POST")
-	r.HandleFunc("/device/{id}/alarm", alarmsC.GetByDevice).Methods("GET")
-	r.HandleFunc("/alarm/{id}/", alarmsC.Delete).Methods("DELETE")
-	r.HandleFunc("/alarm/{id}/", alarmsC.Get).Methods("GET")
+	s.HandleFunc("/devices/{id}/alarms", alarmsC.Create).Methods("POST")
+	s.HandleFunc("/devices/{id}/alarms", alarmsC.GetByDevice).Methods("GET")
+	s.HandleFunc("/alarms/{id}/", alarmsC.Delete).Methods("DELETE")
+	s.HandleFunc("/alarms/{id}/", alarmsC.Get).Methods("GET")
+	s.HandleFunc("/alarms", alarmsC.GetMany).Methods("GET")
+
+	// Subscriptions CRUD
+	s.HandleFunc("/devices/{id}/subscribe/", subscriptionsC.Create).Methods("POST")
+	s.HandleFunc("/devices/{id}/subscribe/", subscriptionsC.Delete).Methods("DELETE")
+	s.HandleFunc("/subscribe/", subscriptionsC.Create).Methods("POST")
+	s.HandleFunc("/subscribe/", subscriptionsC.GetMany).Methods("GET")
 
 	//Roles CRUD
-	log.Println("Listening on port 3000")
-	http.ListenAndServe(":3000", r)
+	log.Println("Listening on port 3001")
+	http.ListenAndServe(":3001", r)
 }
