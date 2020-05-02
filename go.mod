@@ -20,6 +20,6 @@ require (
 	github.com/sourcegraph/go-langserver v2.0.0+incompatible // indirect
 	github.com/sourcegraph/jsonrpc2 v0.0.0-20190106185902-35a74f039c6a // indirect
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271
-	golang.org/x/crypto v0.0.0-20191010185427-af544f31c8ac // indirect
+	golang.org/x/crypto v0.0.0-20191010185427-af544f31c8ac
 	google.golang.org/appengine v1.6.5 // indirect
 )

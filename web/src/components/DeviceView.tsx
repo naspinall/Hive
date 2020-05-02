@@ -23,7 +23,7 @@ interface Props {}
 const DeviceView: React.FunctionComponent<Props> = () => {
   const [params, setParams] = useState({});
   const [search, setSearch] = useState("");
-  const { response, error, isLoading } = useArrayRequest<Device>(
+  const { response, isLoading } = useArrayRequest<Device>(
     "/api/devices",
     params
   );

@@ -8,9 +8,12 @@ import {
   NavbarMenu,
   NavbarStart,
   NavbarDropdown,
-  NavbarEnd
+  NavbarEnd,
+  Button,
 } from "bloomer";
 import { Link } from "react-router-dom";
+import { AuthContext } from "../hooks/auth";
+import { useContext } from "react";
 
 interface RouteDescription {
   path: string;
@@ -27,12 +30,12 @@ interface NaveRouteMenuProps {
   menu: RouteMenu;
 }
 
-const NavRouteMenu: React.FunctionComponent<NaveRouteMenuProps> = props => {
+const NavRouteMenu: React.FunctionComponent<NaveRouteMenuProps> = (props) => {
   return (
     <NavbarItem hasDropdown isHoverable>
       <NavbarItem>{props.menu.displayName}</NavbarItem>
       <NavbarDropdown>
-        {props.menu.routes.map(menuItem => (
+        {props.menu.routes.map((menuItem) => (
           <NavbarItem
             style={{ cursor: "pointer" }}
             key={`goto-${menuItem.path}`}
@@ -49,7 +52,8 @@ interface NavProps {
   routes: Array<RouteMenu | RouteDescription>;
 }
 
-const Nav: React.FunctionComponent<NavProps> = props => {
+const Nav: React.FunctionComponent<NavProps> = (props) => {
+  const { AuthState } = useContext(AuthContext);
   return (
     <Navbar style={{ borderBottom: "solid 1px #FFFFFF", margin: "0" }}>
       <NavbarBrand>
@@ -74,7 +78,7 @@ const Nav: React.FunctionComponent<NavProps> = props => {
       </NavbarBrand>
       <NavbarMenu hasTextColor="dark">
         <NavbarStart>
-          {props.routes.map(route => {
+          {props.routes.map((route) => {
             return "routes" in route ? (
               <NavRouteMenu
                 menu={route}
@@ -88,6 +92,15 @@ const Nav: React.FunctionComponent<NavProps> = props => {
           })}
         </NavbarStart>
         <NavbarEnd>
+          {AuthState.isAuthenticated ? (
+            <NavbarItem>{AuthState.displayName}</NavbarItem>
+          ) : (
+            <Link to="/signup">
+              <Button isColor="info" style={{ margin: "1em" }}>
+                New User
+              </Button>
+            </Link>
+          )}
           <NavbarItem href="https://github.com/naspinall/hive" isHidden="touch">
             <Icon className="fa fa-github" />
           </NavbarItem>

@@ -47,6 +47,7 @@ func main() {
 	s.HandleFunc("/users", usersC.Create).Methods("POST")
 	s.HandleFunc("/users/{id}/", usersC.Delete).Methods("DELETE")
 	s.HandleFunc("/users/{id}/", usersC.Get).Methods("GET")
+	s.HandleFunc("/login", usersC.Login).Methods("POST")
 
 	//Measurement CRUD
 	s.HandleFunc("/devices/{id}/measurements", measurementsC.Create).Methods("POST")

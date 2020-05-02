@@ -1,17 +1,40 @@
 package models
 
 import (
+	"regexp"
+
 	"github.com/jinzhu/gorm"
+	"golang.org/x/crypto/bcrypt"
+)
+
+type modelError string
+
+const pepper = "CMB"
+
+func (e modelError) Error() string {
+	return string(e)
+}
+
+const (
+	ErrNotFound            modelError = "Not found"
+	ErrIDInvalid           modelError = "ID provided was invalid"
+	ErrPasswordInvalid     modelError = "Invalid password"
+	ErrEmailRequired       modelError = "Email required"
+	ErrEmailInvalid        modelError = "Email invalid"
+	ErrPasswordTooShort    modelError = "Password is too short"
+	ErrPasswordRequired    modelError = "Password is required"
+	ErrBadLogin            modelError = "Invalid Password or Email"
+	ErrDisplayNameRequired modelError = "Display Name Required"
 )
 
 // User Structs
 
 type User struct {
 	gorm.Model
-	Username     string `gorm:"not null;unique_index"`
-	Password     string `gorm:"-"`
-	PasswordHash string `gorm:"not null"`
-	DisplayName  string `gorm:"not null"`
+	Email        string `gorm:"not null;unique_index" json:"email"`
+	Password     string `gorm:"not null"  json:"password"`
+	PasswordHash string `gorm:"not null"  json:"-"`
+	DisplayName  string `gorm:"not null"  json:"displayName"`
 }
 
 type userGorm struct {
@@ -19,7 +42,6 @@ type userGorm struct {
 }
 
 // User Interfaces
-// Add Validation here later I guess
 type UserService interface {
 	UserDB
 }
@@ -31,16 +53,27 @@ type UserDB interface {
 	Create(user *User) error
 	Update(user *User) error
 	Delete(id uint) error
+	Authenticate(email, password string) (*User, error)
 }
+
+type userValFunc func(*User) error
 
 type userService struct {
 	UserDB
 }
 
+type userValidator struct {
+	UserDB
+	emailRegex    *regexp.Regexp
+	passwordRegex *regexp.Regexp
+}
+
 func NewUserService(db *gorm.DB) UserService {
+	ug := &userGorm{db: db}
 	return &userService{
-		&userGorm{
-			db: db,
+		&userValidator{
+			UserDB:     ug,
+			emailRegex: regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,16}$`),
 		},
 	}
 }
@@ -65,6 +98,11 @@ func (ug *userGorm) ByID(id uint) (*User, error) {
 	return &user, nil
 
 }
+
+func (uv *userValidator) ByID(id uint) (*User, error) {
+	return uv.UserDB.ByID(id)
+}
+
 func (ug *userGorm) ByEmail(email string) (*User, error) {
 	var user User
 	if err := ug.db.Where("email = ?", email).First(&user).Error; err != nil {
@@ -73,13 +111,145 @@ func (ug *userGorm) ByEmail(email string) (*User, error) {
 	return &user, nil
 }
 
+func (uv *userValidator) ByEmail(email string) (*User, error) {
+	return uv.UserDB.ByEmail(email)
+}
+
+func (ug *userGorm) Authenticate(email, password string) (*User, error) {
+
+	u, err := ug.ByEmail(email)
+	if err != nil {
+		return nil, err
+	}
+
+	// Adding pepeper to the password.
+	toBeCompared := password + pepper
+
+	// Comparing hashed password
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(toBeCompared)); err != nil {
+		return nil, err
+	}
+	return u, nil
+
+}
+
+func (uv *userValidator) Authenticate(email, password string) (*User, error) {
+	return uv.UserDB.Authenticate(email, password)
+}
+
 func (ug *userGorm) Create(user *User) error {
 	return ug.db.Create(user).Error
 }
+
+func (uv *userValidator) Create(user *User) error {
+	// Ordering in terms of cost.
+
+	if err := uv.runUserValFns(user, uv.hasEmail, uv.validEmail, uv.hasDisplayName, uv.hasPassword, uv.hashPassword, uv.hasPasswordHash); err != nil {
+		return err
+	}
+
+	return uv.UserDB.Create(user)
+}
+
 func (ug *userGorm) Update(user *User) error {
 	return ug.db.Save(user).Error
 }
+
+func (uv *userValidator) Update(user *User) error {
+	if err := uv.runUserValFns(user, uv.validEmail, uv.validPassword, uv.hashPassword); err != nil {
+		return err
+	}
+
+	return uv.UserDB.Update(user)
+}
+
 func (ug *userGorm) Delete(id uint) error {
 	user := User{Model: gorm.Model{ID: id}}
 	return ug.db.Delete(user).Error
+}
+
+func (uv *userValidator) Delete(id uint) error {
+	return uv.UserDB.Delete(id)
+}
+
+func (uv *userValidator) runUserValFns(u *User, fns ...userValFunc) error {
+	for _, fn := range fns {
+		if err := fn(u); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (uv *userValidator) hashPassword(user *User) error {
+	// Running only if password hasn't already been hashed
+	if user.Password == "" {
+		return nil
+	}
+
+	// Adding pepper to password.
+	toBeHashed := user.Password + pepper
+
+	// Hashing using bcrypt, salt is automatically added to the password.
+	hash, err := bcrypt.GenerateFromPassword([]byte(toBeHashed), 6)
+	if err != nil {
+		return err
+	}
+	// Adding hash to user object
+	user.PasswordHash = string(hash)
+
+	// Removing password
+	user.Password = ""
+
+	return nil
+}
+
+func (uv *userValidator) hasEmail(user *User) error {
+	if user.Email == "" {
+		return ErrEmailRequired
+	}
+	return nil
+}
+
+func (uv *userValidator) hasPassword(user *User) error {
+	if user.Password == "" {
+		return ErrPasswordRequired
+	}
+	return nil
+}
+
+func (uv *userValidator) hasPasswordHash(user *User) error {
+	if user.PasswordHash == "" {
+		return ErrPasswordRequired
+	}
+	return nil
+}
+
+func (uv *userValidator) hasDisplayName(user *User) error {
+	if user.DisplayName == "" {
+		return ErrDisplayNameRequired
+	}
+	return nil
+}
+
+func (uv *userValidator) validEmail(user *User) error {
+	if user.Email == "" {
+		return nil
+	}
+	if uv.emailRegex.Match([]byte(user.Email)) {
+		return nil
+	}
+
+	return ErrEmailInvalid
+}
+func (uv *userValidator) validPassword(user *User) error {
+	if user.Password == "" {
+		return nil
+	}
+	if len(user.Password) > 8 {
+		return nil
+	}
+
+	return ErrPasswordInvalid
 }
