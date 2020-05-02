@@ -7,7 +7,7 @@ import { AlarmTable } from "../components/AlarmTable";
 interface Props {}
 
 export default function Alarms(): ReactElement {
-  const { response, error, isLoading } = useArrayRequest("/api/alarms");
+  const { response, isLoading } = useArrayRequest("/api/alarms");
   return (
     <Container isFluid style={{ marginTop: 10 }}>
       <Level>
