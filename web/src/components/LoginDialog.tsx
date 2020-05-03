@@ -25,7 +25,7 @@ const LoginDialog = () => {
   const loginButton = async () => {
     try {
       const { data } = await Axios.post("/api/login", {
-        username: username,
+        email: username,
         password: password,
       });
       Login(data.username, data.displayName);

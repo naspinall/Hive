@@ -92,14 +92,8 @@ const Nav: React.FunctionComponent<NavProps> = (props) => {
           })}
         </NavbarStart>
         <NavbarEnd>
-          {AuthState.isAuthenticated ? (
+          {AuthState.isAuthenticated && (
             <NavbarItem>{AuthState.displayName}</NavbarItem>
-          ) : (
-            <Link to="/signup">
-              <Button isColor="info" style={{ margin: "1em" }}>
-                New User
-              </Button>
-            </Link>
           )}
           <NavbarItem href="https://github.com/naspinall/hive" isHidden="touch">
             <Icon className="fa fa-github" />

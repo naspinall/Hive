@@ -24,7 +24,7 @@ const DeviceView: React.FunctionComponent<Props> = () => {
   const [params, setParams] = useState({});
   const [search, setSearch] = useState("");
   const { response, isLoading } = useArrayRequest<Device>(
-    "/api/devices",
+    "/api/devices/",
     params
   );
   const [createActive, setCreateActive] = useState(false);

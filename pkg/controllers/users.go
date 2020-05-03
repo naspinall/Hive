@@ -104,6 +104,10 @@ func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.SetCookie(w, &cookie)
+	err = json.NewEncoder(w).Encode(&user)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (u *Users) GetMany(w http.ResponseWriter, r *http.Request) {
