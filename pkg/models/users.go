@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"regexp"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/jinzhu/gorm"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -37,6 +38,11 @@ type User struct {
 	Password     string `gorm:"not null"  json:"password,omitempty"`
 	PasswordHash string `gorm:"not null"  json:"-"`
 	DisplayName  string `gorm:"not null"  json:"displayName"`
+}
+
+type UserClaims struct {
+	UserID uint `json:"userId"`
+	jwt.StandardClaims
 }
 
 type userGorm struct {
@@ -137,6 +143,10 @@ func (ug *userGorm) Authenticate(email, password string, ctx context.Context) (*
 }
 
 func (uv *userValidator) Authenticate(email, password string, ctx context.Context) (*User, error) {
+	user := &User{Email: email, Password: password}
+	if err := uv.runUserValFns(user, uv.hasEmail, uv.validEmail, uv.hasPassword); err != nil {
+		return nil, err
+	}
 	return uv.UserDB.Authenticate(email, password, ctx)
 }
 

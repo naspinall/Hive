@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/naspinall/Hive/pkg/models"
 )
@@ -88,12 +90,20 @@ func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
-	err = json.NewEncoder(w).Encode(&fu)
+
+	token, err := u.signJWT(fu)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	cookie := http.Cookie{
+		Name:     "token",
+		Value:    token,
+		HttpOnly: true,
+	}
+
+	http.SetCookie(w, &cookie)
 }
 
 func (u *Users) GetMany(w http.ResponseWriter, r *http.Request) {
@@ -109,4 +119,17 @@ func (u *Users) GetMany(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+
+func (u *Users) signJWT(user *models.User) (string, error) {
+	claims := models.UserClaims{
+		UserID: user.ID,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(time.Hour * 2).Unix(),
+			Issuer:    "Hive",
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	return token.SignedString([]byte("JWTSecretReallySecret"))
 }
