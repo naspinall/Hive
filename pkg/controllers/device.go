@@ -28,7 +28,7 @@ func (d *Devices) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	if err := d.ds.Create(&device); err != nil {
+	if err := d.ds.Create(&device, r.Context()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
@@ -44,7 +44,7 @@ func (d *Devices) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	if err := d.ds.Delete(uint(id)); err != nil {
+	if err := d.ds.Delete(uint(id), r.Context()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -57,7 +57,7 @@ func (d *Devices) Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	device, err := d.ds.ByID(uint(id))
+	device, err := d.ds.ByID(uint(id), r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -80,7 +80,7 @@ func (d *Devices) GetMany(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 	}
-	devices, err := d.ds.Many(int(count))
+	devices, err := d.ds.Many(int(count), r.Context())
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&devices)
 
@@ -100,7 +100,7 @@ func (d *Devices) GetByName(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Name required for search", http.StatusBadRequest)
 	}
 
-	devices, err := d.ds.SearchByName(name)
+	devices, err := d.ds.SearchByName(name, r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

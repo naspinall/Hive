@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/jinzhu/gorm"
@@ -24,12 +26,12 @@ type AlarmService interface {
 }
 
 type AlarmDB interface {
-	ByID(id uint) (*Alarm, error)
-	ByDevice(id uint) ([]Alarm, error)
-	Create(alarm *Alarm) error
-	Update(alarm *Alarm) error
-	Delete(id uint) error
-	Many(count int) ([]*Alarm, error)
+	ByID(id uint, ctx context.Context) (*Alarm, error)
+	ByDevice(id uint, ctx context.Context) ([]Alarm, error)
+	Create(alarm *Alarm, ctx context.Context) error
+	Update(alarm *Alarm, ctx context.Context) error
+	Delete(id uint, ctx context.Context) error
+	Many(count int, ctx context.Context) ([]*Alarm, error)
 }
 
 func NewAlarmService(db *gorm.DB) AlarmService {
@@ -38,43 +40,43 @@ func NewAlarmService(db *gorm.DB) AlarmService {
 	}
 }
 
-func (ag *alarmGorm) ByDevice(id uint) ([]Alarm, error) {
+func (ag *alarmGorm) ByDevice(id uint, ctx context.Context) ([]Alarm, error) {
 
 	device := Device{Model: gorm.Model{ID: id}}
 	alarms := []Alarm{}
-	if err := ag.db.Model(&device).Related(&alarms).Error; err != nil {
+	if err := ag.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Model(&device).Related(&alarms).Error; err != nil {
 		return nil, err
 	}
 	fmt.Print(alarms)
 	return alarms, nil
 }
 
-func (ag *alarmGorm) ByID(id uint) (*Alarm, error) {
+func (ag *alarmGorm) ByID(id uint, ctx context.Context) (*Alarm, error) {
 	var alarm Alarm
-	if err := ag.db.Where("id = ?", id).First(&alarm).Error; err != nil {
+	if err := ag.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Where("id = ?", id).First(&alarm).Error; err != nil {
 		return nil, err
 	}
 
 	return &alarm, nil
 }
 
-func (ag *alarmGorm) Many(count int) ([]*Alarm, error) {
+func (ag *alarmGorm) Many(count int, ctx context.Context) ([]*Alarm, error) {
 
 	var alarms []*Alarm
-	if err := ag.db.Limit(count).Find(&alarms).Error; err != nil {
+	if err := ag.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Limit(count).Find(&alarms).Error; err != nil {
 		return nil, err
 	}
 	return alarms, nil
 }
 
-func (ag *alarmGorm) Create(alarm *Alarm) error {
-	return ag.db.Create(alarm).Error
+func (ag *alarmGorm) Create(alarm *Alarm, ctx context.Context) error {
+	return ag.db.BeginTx(ctx, &sql.TxOptions{}).Create(alarm).Error
 }
 
-func (ag *alarmGorm) Update(alarm *Alarm) error {
-	return ag.db.Save(alarm).Error
+func (ag *alarmGorm) Update(alarm *Alarm, ctx context.Context) error {
+	return ag.db.BeginTx(ctx, &sql.TxOptions{}).Save(alarm).Error
 }
-func (ag *alarmGorm) Delete(id uint) error {
+func (ag *alarmGorm) Delete(id uint, ctx context.Context) error {
 	alarm := Alarm{Model: gorm.Model{ID: id}}
-	return ag.db.Delete(alarm).Error
+	return ag.db.BeginTx(ctx, &sql.TxOptions{}).Delete(alarm).Error
 }

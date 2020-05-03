@@ -45,6 +45,7 @@ func main() {
 
 	//User CRUD
 	s.HandleFunc("/users", usersC.Create).Methods("POST")
+	s.HandleFunc("/users", usersC.GetMany).Methods("GET")
 	s.HandleFunc("/users/{id}/", usersC.Delete).Methods("DELETE")
 	s.HandleFunc("/users/{id}/", usersC.Get).Methods("GET")
 	s.HandleFunc("/login", usersC.Login).Methods("POST")

@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+	"database/sql"
 	"regexp"
 
 	"github.com/jinzhu/gorm"
@@ -32,7 +34,7 @@ const (
 type User struct {
 	gorm.Model
 	Email        string `gorm:"not null;unique_index" json:"email"`
-	Password     string `gorm:"not null"  json:"password"`
+	Password     string `gorm:"not null"  json:"password,omitempty"`
 	PasswordHash string `gorm:"not null"  json:"-"`
 	DisplayName  string `gorm:"not null"  json:"displayName"`
 }
@@ -47,13 +49,14 @@ type UserService interface {
 }
 
 type UserDB interface {
-	ByID(id uint) (*User, error)
-	ByEmail(email string) (*User, error)
+	ByID(id uint, ctx context.Context) (*User, error)
+	ByEmail(email string, ctx context.Context) (*User, error)
 
-	Create(user *User) error
-	Update(user *User) error
-	Delete(id uint) error
-	Authenticate(email, password string) (*User, error)
+	Create(user *User, ctx context.Context) error
+	Update(user *User, ctx context.Context) error
+	Delete(id uint, ctx context.Context) error
+	Authenticate(email, password string, ctx context.Context) (*User, error)
+	Many(ctx context.Context) ([]*User, error)
 }
 
 type userValFunc func(*User) error
@@ -90,20 +93,20 @@ func newUserGorm(connectionString string) (*userGorm, error) {
 }
 
 // Implementing the UserDB Interface
-func (ug *userGorm) ByID(id uint) (*User, error) {
+func (ug *userGorm) ByID(id uint, ctx context.Context) (*User, error) {
 	var user User
-	if err := ug.db.Where("id = ?", id).First(&user).Error; err != nil {
+	if err := ug.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Where("id = ?", id).First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
 
 }
 
-func (uv *userValidator) ByID(id uint) (*User, error) {
-	return uv.UserDB.ByID(id)
+func (uv *userValidator) ByID(id uint, ctx context.Context) (*User, error) {
+	return uv.UserDB.ByID(id, ctx)
 }
 
-func (ug *userGorm) ByEmail(email string) (*User, error) {
+func (ug *userGorm) ByEmail(email string, ctx context.Context) (*User, error) {
 	var user User
 	if err := ug.db.Where("email = ?", email).First(&user).Error; err != nil {
 		return nil, err
@@ -111,13 +114,13 @@ func (ug *userGorm) ByEmail(email string) (*User, error) {
 	return &user, nil
 }
 
-func (uv *userValidator) ByEmail(email string) (*User, error) {
-	return uv.UserDB.ByEmail(email)
+func (uv *userValidator) ByEmail(email string, ctx context.Context) (*User, error) {
+	return uv.UserDB.ByEmail(email, ctx)
 }
 
-func (ug *userGorm) Authenticate(email, password string) (*User, error) {
+func (ug *userGorm) Authenticate(email, password string, ctx context.Context) (*User, error) {
 
-	u, err := ug.ByEmail(email)
+	u, err := ug.ByEmail(email, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -133,43 +136,53 @@ func (ug *userGorm) Authenticate(email, password string) (*User, error) {
 
 }
 
-func (uv *userValidator) Authenticate(email, password string) (*User, error) {
-	return uv.UserDB.Authenticate(email, password)
+func (uv *userValidator) Authenticate(email, password string, ctx context.Context) (*User, error) {
+	return uv.UserDB.Authenticate(email, password, ctx)
 }
 
-func (ug *userGorm) Create(user *User) error {
+func (ug *userGorm) Create(user *User, ctx context.Context) error {
 	return ug.db.Create(user).Error
 }
 
-func (uv *userValidator) Create(user *User) error {
+func (uv *userValidator) Create(user *User, ctx context.Context) error {
 	// Ordering in terms of cost.
 
 	if err := uv.runUserValFns(user, uv.hasEmail, uv.validEmail, uv.hasDisplayName, uv.hasPassword, uv.hashPassword, uv.hasPasswordHash); err != nil {
 		return err
 	}
 
-	return uv.UserDB.Create(user)
+	return uv.UserDB.Create(user, ctx)
 }
 
-func (ug *userGorm) Update(user *User) error {
+func (ug *userGorm) Many(ctx context.Context) ([]*User, error) {
+	var users []*User
+	if err := ug.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Limit(100).Find(&users).Error; err != nil {
+		return nil, err
+	}
+
+	return users, nil
+
+}
+
+func (ug *userGorm) Update(user *User, ctx context.Context) error {
 	return ug.db.Save(user).Error
 }
 
-func (uv *userValidator) Update(user *User) error {
+func (uv *userValidator) Update(user *User, ctx context.Context) error {
 	if err := uv.runUserValFns(user, uv.validEmail, uv.validPassword, uv.hashPassword); err != nil {
 		return err
 	}
 
-	return uv.UserDB.Update(user)
+	return uv.UserDB.Update(user, ctx)
 }
 
-func (ug *userGorm) Delete(id uint) error {
+func (ug *userGorm) Delete(id uint, ctx context.Context) error {
 	user := User{Model: gorm.Model{ID: id}}
 	return ug.db.Delete(user).Error
 }
 
-func (uv *userValidator) Delete(id uint) error {
-	return uv.UserDB.Delete(id)
+func (uv *userValidator) Delete(id uint, ctx context.Context) error {
+	return uv.UserDB.Delete(id, ctx)
 }
 
 func (uv *userValidator) runUserValFns(u *User, fns ...userValFunc) error {

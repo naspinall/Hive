@@ -32,7 +32,7 @@ func (m *Measurements) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	measurement.DeviceID = int(id)
 
-	if err := m.ms.Create(&measurement); err != nil {
+	if err := m.ms.Create(&measurement, r.Context()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
@@ -47,7 +47,7 @@ func (m *Measurements) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	if err := m.ms.Delete(uint(id)); err != nil {
+	if err := m.ms.Delete(uint(id), r.Context()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -60,7 +60,7 @@ func (m *Measurements) Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	measurement, err := m.ms.ByID(uint(id))
+	measurement, err := m.ms.ByID(uint(id), r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -79,7 +79,7 @@ func (m *Measurements) GetByDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	measurements, err := m.ms.ByDevice(uint(id))
+	measurements, err := m.ms.ByDevice(uint(id), r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

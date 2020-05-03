@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 
 	"github.com/jinzhu/gorm"
@@ -26,15 +28,15 @@ type deviceRabbitMQ struct {
 type DeviceDB interface {
 
 	//Getters
-	ByName(name string) (*Device, error)
-	ByID(id uint) (*Device, error)
+	ByName(name string, ctx context.Context) (*Device, error)
+	ByID(id uint, ctx context.Context) (*Device, error)
 
 	//Mutators
-	Create(device *Device) error
-	Update(device *Device) error
-	Delete(id uint) error
-	Many(count int) ([]*Device, error)
-	SearchByName(name string) ([]*Device, error)
+	Create(device *Device, ctx context.Context) error
+	Update(device *Device, ctx context.Context) error
+	Delete(id uint, ctx context.Context) error
+	Many(count int, ctx context.Context) ([]*Device, error)
+	SearchByName(name string, ctx context.Context) ([]*Device, error)
 }
 
 type DeviceMultiplexer struct {
@@ -99,21 +101,21 @@ func NewDeviceService(db *gorm.DB) DeviceService {
 }
 
 //Getters
-func (dg *deviceGorm) Many(count int) ([]*Device, error) {
+func (dg *deviceGorm) Many(count int, ctx context.Context) ([]*Device, error) {
 	var devices []*Device
 
-	err := dg.db.Limit(count).Find(&devices).Error
+	err := dg.db.BeginTx(ctx, &sql.TxOptions{}).Limit(count).Find(&devices).Error
 	if err != nil {
 		return nil, err
 	}
 	return devices, nil
 }
 
-func (dg *deviceGorm) ByName(name string) (*Device, error) {
+func (dg *deviceGorm) ByName(name string, ctx context.Context) (*Device, error) {
 
 	var device Device
 	//Getting Device from database.
-	err := dg.db.Where("name = ?", name).First(&device).Error
+	err := dg.db.BeginTx(ctx, &sql.TxOptions{}).Where("name = ?", name).First(&device).Error
 	if err != nil {
 		return nil, err
 	}
@@ -121,10 +123,10 @@ func (dg *deviceGorm) ByName(name string) (*Device, error) {
 	return &device, nil
 }
 
-func (dg *deviceGorm) ByID(id uint) (*Device, error) {
+func (dg *deviceGorm) ByID(id uint, ctx context.Context) (*Device, error) {
 	var device Device
 	//Getting Device from database.
-	err := dg.db.Where("id = ?", id).First(&device).Error
+	err := dg.db.BeginTx(ctx, &sql.TxOptions{}).Where("id = ?", id).First(&device).Error
 	if err != nil {
 		return nil, err
 	}
@@ -132,28 +134,28 @@ func (dg *deviceGorm) ByID(id uint) (*Device, error) {
 	return &device, nil
 }
 
-func (dg *deviceGorm) SearchByName(name string) ([]*Device, error) {
+func (dg *deviceGorm) SearchByName(name string, ctx context.Context) ([]*Device, error) {
 	var devices []*Device
-	if err := dg.db.Where("name LIKE ?", "%"+name+"%").Find(&devices).Error; err != nil {
+	if err := dg.db.BeginTx(ctx, &sql.TxOptions{}).Where("name LIKE ?", "%"+name+"%").Find(&devices).Error; err != nil {
 		return nil, err
 	}
 	return devices, nil
 }
 
 //Mutators
-func (dg *deviceGorm) Create(device *Device) (err error) {
-	err = dg.db.Create(device).Error
+func (dg *deviceGorm) Create(device *Device, ctx context.Context) (err error) {
+	err = dg.db.BeginTx(ctx, &sql.TxOptions{}).Create(device).Error
 	return
 }
 
-func (dg *deviceGorm) Update(device *Device) (err error) {
-	err = dg.db.Save(device).Error
+func (dg *deviceGorm) Update(device *Device, ctx context.Context) (err error) {
+	err = dg.db.BeginTx(ctx, &sql.TxOptions{}).Save(device).Error
 	return
 }
 
-func (dg *deviceGorm) Delete(id uint) (err error) {
+func (dg *deviceGorm) Delete(id uint, ctx context.Context) (err error) {
 	device := Device{Model: gorm.Model{ID: id}}
-	err = dg.db.Delete(&device).Error
+	err = dg.db.BeginTx(ctx, &sql.TxOptions{}).Delete(&device).Error
 	return
 }
 
@@ -198,31 +200,31 @@ func (dr *deviceRabbitMQ) AutoCreateQueue() error {
 }
 
 //Getters
-func (dm *DeviceMultiplexer) ByName(name string) (*Device, error) {
-	return dm.DeviceDB.ByName(name)
+func (dm *DeviceMultiplexer) ByName(name string, ctx context.Context) (*Device, error) {
+	return dm.DeviceDB.ByName(name, ctx)
 }
-func (dm *DeviceMultiplexer) ByID(id uint) (*Device, error) {
-	return dm.DeviceDB.ByID(id)
+func (dm *DeviceMultiplexer) ByID(id uint, ctx context.Context) (*Device, error) {
+	return dm.DeviceDB.ByID(id, ctx)
 }
 
 //Mutators
-func (dm *DeviceMultiplexer) Create(device *Device) error {
+func (dm *DeviceMultiplexer) Create(device *Device, ctx context.Context) error {
 
 	if err := dm.Publish(device); err != nil {
 		return err
 	}
-	return dm.DeviceDB.Create(device)
+	return dm.DeviceDB.Create(device, ctx)
 }
-func (dm *DeviceMultiplexer) Update(device *Device) error {
+func (dm *DeviceMultiplexer) Update(device *Device, ctx context.Context) error {
 
 	if err := dm.Publish(device); err != nil {
 		return err
 	}
-	return dm.DeviceDB.Update(device)
+	return dm.DeviceDB.Update(device, ctx)
 }
-func (dm *DeviceMultiplexer) Delete(id uint) error {
+func (dm *DeviceMultiplexer) Delete(id uint, ctx context.Context) error {
 
-	device, err := dm.ByID(id)
+	device, err := dm.ByID(id, ctx)
 	if err != nil {
 		return nil
 	}
@@ -231,7 +233,7 @@ func (dm *DeviceMultiplexer) Delete(id uint) error {
 		return err
 	}
 
-	return dm.DeviceDB.Delete(id)
+	return dm.DeviceDB.Delete(id, ctx)
 }
 
 //Database Operations
