@@ -31,7 +31,7 @@ func (a *Alarms) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	alarm.DeviceID = int(id)
 
-	if err := a.as.Create(&alarm); err != nil {
+	if err := a.as.Create(&alarm, r.Context()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
@@ -46,7 +46,7 @@ func (a *Alarms) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	if err := a.as.Delete(uint(id)); err != nil {
+	if err := a.as.Delete(uint(id), r.Context()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -59,7 +59,7 @@ func (a *Alarms) Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	alarm, err := a.as.ByID(uint(id))
+	alarm, err := a.as.ByID(uint(id), r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -78,7 +78,7 @@ func (a *Alarms) GetByDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	alarms, err := a.as.ByDevice(uint(id))
+	alarms, err := a.as.ByDevice(uint(id), r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -101,7 +101,7 @@ func (a *Alarms) GetMany(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 	}
-	alarms, err := a.as.Many(int(count))
+	alarms, err := a.as.Many(int(count), r.Context())
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&alarms)
 

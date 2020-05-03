@@ -21,13 +21,14 @@ func NewUsers(us models.UserService) *Users {
 
 func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 	var user models.User
+
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := u.us.Create(&user); err != nil {
+	if err := u.us.Create(&user, r.Context()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -45,7 +46,7 @@ func (u *Users) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := u.us.Delete(uint(id)); err != nil {
+	if err := u.us.Delete(uint(id), r.Context()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -60,7 +61,7 @@ func (u *Users) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := u.us.ByID(uint(id))
+	user, err := u.us.ByID(uint(id), r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -82,12 +83,27 @@ func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fu, err := u.us.Authenticate(user.Email, user.Password)
+	fu, err := u.us.Authenticate(user.Email, user.Password, r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 	err = json.NewEncoder(w).Encode(&fu)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+}
+
+func (u *Users) GetMany(w http.ResponseWriter, r *http.Request) {
+	users, err := u.us.Many(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(&users)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
