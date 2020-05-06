@@ -5,24 +5,27 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/naspinall/Hive/pkg/config"
+
 	"github.com/gorilla/mux"
 	"github.com/naspinall/Hive/pkg/controllers"
-	"github.com/naspinall/Hive/pkg/middleware"
 	"github.com/naspinall/Hive/pkg/models"
 )
 
-const (
-	host     = "localhost"
-	port     = 5432
-	user     = "postgres"
-	password = "hive"
-	dbname   = "hive"
-)
-
 func main() {
-	connectionString := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
 
-	services, err := models.NewServices(connectionString)
+	cfg := config.LoadConfig()
+	dbCfg := cfg.Database
+
+	services, err := models.NewServices(
+		models.WithGorm(dbCfg.Dialect(), dbCfg.ConnectionInfo()),
+		models.WithLogMode(true),
+		models.WithUsers(cfg.Pepper),
+		models.WithMeasurements(),
+		models.WithDevices(),
+		models.WithAlarms(),
+	)
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -34,15 +37,16 @@ func main() {
 	measurementsC := controllers.NewMeasurements(services.Measurement)
 	alarmsC := controllers.NewAlarms(services.Alarm)
 	subscriptionsC := controllers.NewSubscriptions(services.Subscription)
+	//auth := middleware.NewJWTAuth(cfg.JWTKey)
 
 	r := mux.NewRouter()
 	api := r.PathPrefix("/api").Subrouter()
 
 	api.HandleFunc("/login", usersC.Login).Methods("POST")
 
-	//Device CRUD, requires JWT Auth
+	//Device CRUD, requires JWT Auth(cfg.JWTKey)
 	d := api.PathPrefix("/devices").Subrouter()
-	d.Use(middleware.Auth)
+	//d.Use(auth)
 	d.HandleFunc("/", devicesC.GetMany).Methods("GET")
 	d.HandleFunc("/", devicesC.Create).Methods("POST")
 	d.HandleFunc("/{id}/", devicesC.Delete).Methods("DELETE")
@@ -56,7 +60,7 @@ func main() {
 
 	//User CRUD
 	u := api.PathPrefix("/users").Subrouter()
-	u.Use(middleware.Auth)
+	//u.Use(auth)
 	u.HandleFunc("/", usersC.Create).Methods("POST")
 	u.HandleFunc("/", usersC.GetMany).Methods("GET")
 	u.HandleFunc("/{id}/", usersC.Delete).Methods("DELETE")
@@ -64,24 +68,24 @@ func main() {
 
 	//Measurement CRUD
 	m := api.PathPrefix("/measurements").Subrouter()
-	m.Use(middleware.Auth)
+	//m.Use(auth)
 	m.HandleFunc("/{id}/", measurementsC.Delete).Methods("DELETE")
 	m.HandleFunc("/{id}/", measurementsC.Get).Methods("GET")
 
 	//Alarm CRUD
 	a := api.PathPrefix("/alarms").Subrouter()
-	a.Use(middleware.Auth)
+	//a.Use(auth)
 	a.HandleFunc("/{id}/", alarmsC.Delete).Methods("DELETE")
 	a.HandleFunc("/{id}/", alarmsC.Get).Methods("GET")
 	a.HandleFunc("/", alarmsC.GetMany).Methods("GET")
 
 	// Subscriptions CRUD
 	s := api.PathPrefix("/subscribe").Subrouter()
-	s.Use(middleware.Auth)
+	//s.Use(auth)
 	s.HandleFunc("/", subscriptionsC.Create).Methods("POST")
 	s.HandleFunc("/", subscriptionsC.GetMany).Methods("GET")
 
 	//Roles CRUD
 	log.Println("Listening on port 3001")
-	http.ListenAndServe(":3001", r)
+	http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), r)
 }

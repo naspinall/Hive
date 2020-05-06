@@ -12,8 +12,6 @@ import (
 
 type modelError string
 
-const pepper = "CMB"
-
 func (e modelError) Error() string {
 	return string(e)
 }
@@ -46,7 +44,9 @@ type UserClaims struct {
 }
 
 type userGorm struct {
-	db *gorm.DB
+	db     *gorm.DB
+	pepper string
+	jwtKey string
 }
 
 // User Interfaces
@@ -69,22 +69,31 @@ type userValFunc func(*User) error
 
 type userService struct {
 	UserDB
+	pepper string
 }
 
 type userValidator struct {
 	UserDB
 	emailRegex    *regexp.Regexp
 	passwordRegex *regexp.Regexp
+	pepper        string
 }
 
-func NewUserService(db *gorm.DB) UserService {
-	ug := &userGorm{db: db}
+func NewUserService(db *gorm.DB, pepper string) UserService {
+	ug := &userGorm{db: db, pepper: pepper}
+	uv := newUserValidator(ug, pepper)
 	return &userService{
-		&userValidator{
-			UserDB:     ug,
-			emailRegex: regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,16}$`),
-		},
+		UserDB: uv,
 	}
+}
+
+func newUserValidator(udb UserDB, pepper string) *userValidator {
+	return &userValidator{
+		UserDB:     udb,
+		emailRegex: regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,16}$`),
+		pepper:     pepper,
+	}
+
 }
 
 func newUserGorm(connectionString string) (*userGorm, error) {
@@ -132,7 +141,7 @@ func (ug *userGorm) Authenticate(email, password string, ctx context.Context) (*
 	}
 
 	// Adding pepeper to the password.
-	toBeCompared := password + pepper
+	toBeCompared := password + ug.pepper
 
 	// Comparing hashed password
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(toBeCompared)); err != nil {
@@ -212,7 +221,7 @@ func (uv *userValidator) hashPassword(user *User) error {
 	}
 
 	// Adding pepper to password.
-	toBeHashed := user.Password + pepper
+	toBeHashed := user.Password + uv.pepper
 
 	// Hashing using bcrypt, salt is automatically added to the password.
 	hash, err := bcrypt.GenerateFromPassword([]byte(toBeHashed), 6)

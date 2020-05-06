@@ -11,7 +11,7 @@ import {
 } from "bloomer";
 import { Columns } from "bloomer/lib/grid/Columns";
 import Axios from "axios";
-import { useAuth, AuthContext } from "../hooks/auth";
+import { AuthContext } from "../hooks/auth";
 import { NotificationContext } from "../hooks/notification";
 
 interface Props {}

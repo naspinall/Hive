@@ -11,7 +11,6 @@ import {
 } from "bloomer";
 import { Columns } from "bloomer/lib/grid/Columns";
 import Axios from "axios";
-import { useAuth } from "../hooks/auth";
 import { NotificationContext } from "../hooks/notification";
 
 interface Props {}
@@ -25,7 +24,7 @@ const SignupDialog = () => {
 
   const loginButton = async () => {
     try {
-      const { data } = await Axios.post("/api/users", {
+      await Axios.post("/api/users", {
         username: username,
         displayName: displayName,
         password: password,
