@@ -31,6 +31,7 @@ func (s *Subscriptions) Create(w http.ResponseWriter, r *http.Request) {
 		id, err = strconv.ParseInt(vars["id"], 10, 64)
 		if err != nil {
 			http.Error(w, "Bad ID", http.StatusBadRequest)
+			return
 		}
 	}
 
@@ -38,18 +39,21 @@ func (s *Subscriptions) Create(w http.ResponseWriter, r *http.Request) {
 	err = json.NewDecoder(r.Body).Decode(&subscription)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
-	subscription.DeviceID = int(id)
+	subscription.DeviceID = uint(id)
 
 	if err = s.ss.Create(&subscription); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&subscription)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
@@ -57,12 +61,14 @@ func (s *Subscriptions) GetMany(w http.ResponseWriter, r *http.Request) {
 	subscriptions, err := s.ss.Many()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(subscriptions)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
@@ -71,10 +77,12 @@ func (s *Subscriptions) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	if err := s.ss.Delete(uint(id)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 

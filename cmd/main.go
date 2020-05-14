@@ -20,6 +20,7 @@ func main() {
 	services, err := models.NewServices(
 		models.WithGorm(dbCfg.Dialect(), dbCfg.ConnectionInfo()),
 		models.WithLogMode(true),
+		models.WithSubscriptions(),
 		models.WithUsers(cfg.Pepper),
 		models.WithMeasurements(),
 		models.WithDevices(),
@@ -40,7 +41,7 @@ func main() {
 	//auth := middleware.NewJWTAuth(cfg.JWTKey)
 
 	r := mux.NewRouter()
-	api := r.PathPrefix("/api").Subrouter()
+	api := r.PathPrefix("/api").Subrouter().StrictSlash(true)
 
 	api.HandleFunc("/login", usersC.Login).Methods("POST")
 
@@ -76,16 +77,18 @@ func main() {
 	a := api.PathPrefix("/alarms").Subrouter()
 	//a.Use(auth)
 	a.HandleFunc("/{id}/", alarmsC.Delete).Methods("DELETE")
+	a.HandleFunc("/{id}/", alarmsC.Create).Methods("POST")
 	a.HandleFunc("/{id}/", alarmsC.Get).Methods("GET")
 	a.HandleFunc("/", alarmsC.GetMany).Methods("GET")
 
 	// Subscriptions CRUD
 	s := api.PathPrefix("/subscribe").Subrouter()
 	//s.Use(auth)
-	s.HandleFunc("/", subscriptionsC.Create).Methods("POST")
+	s.HandleFunc("/{id}/", subscriptionsC.Create).Methods("POST")
+	s.HandleFunc("/{id}/", subscriptionsC.Delete).Methods("DELETE")
 	s.HandleFunc("/", subscriptionsC.GetMany).Methods("GET")
 
 	//Roles CRUD
-	log.Println("Listening on port 3001")
-	http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), r)
+	log.Println(fmt.Sprintf("Listening on port %d", cfg.Port))
+	http.ListenAndServe(":3001", r)
 }

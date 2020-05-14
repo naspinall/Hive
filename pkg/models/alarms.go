@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 
 	"github.com/jinzhu/gorm"
 )
@@ -13,7 +14,7 @@ type Alarm struct {
 	Type     string `gorm:"not null"`
 	Status   string `gorm:"not null"`
 	Severity string `gorm:"not null"`
-	DeviceID int
+	DeviceID uint
 	Device   Device `json:"-"`
 }
 
@@ -34,9 +35,17 @@ type AlarmDB interface {
 	Many(count int, ctx context.Context) ([]*Alarm, error)
 }
 
-func NewAlarmService(db *gorm.DB) AlarmService {
-	return &alarmGorm{
-		db: db,
+type alarmWebhook struct {
+	Subscription SubscriptionService
+	AlarmDB
+}
+
+func NewAlarmService(db *gorm.DB, Subscription SubscriptionService) AlarmService {
+	return &alarmWebhook{
+		Subscription: Subscription,
+		AlarmDB: &alarmGorm{
+			db: db,
+		},
 	}
 }
 
@@ -79,4 +88,49 @@ func (ag *alarmGorm) Update(alarm *Alarm, ctx context.Context) error {
 func (ag *alarmGorm) Delete(id uint, ctx context.Context) error {
 	alarm := Alarm{Model: gorm.Model{ID: id}}
 	return ag.db.BeginTx(ctx, &sql.TxOptions{}).Delete(alarm).Error
+}
+
+func (aw *alarmWebhook) Create(alarm *Alarm, ctx context.Context) error {
+	err := aw.AlarmDB.Create(alarm, ctx)
+	if err != nil {
+		return err
+	}
+
+	err = aw.Subscription.Webhook(alarm.DeviceID, "CREATE", "ALARM", alarm)
+	// Don't want to error for a bad webhook, will just log.
+	if err != nil {
+		log.Println(err)
+	}
+	return nil
+}
+
+func (aw *alarmWebhook) Update(alarm *Alarm, ctx context.Context) error {
+	err := aw.AlarmDB.Update(alarm, ctx)
+	if err != nil {
+		return err
+	}
+
+	err = aw.Subscription.Webhook(alarm.DeviceID, "UPDATE", "ALARM", alarm)
+	// Don't want to error for a bad webhook, will just log.
+	if err != nil {
+		log.Println(err)
+	}
+	return nil
+}
+func (aw *alarmWebhook) Delete(id uint, ctx context.Context) error {
+	alarm, err := aw.AlarmDB.ByID(id, ctx)
+	if err != nil {
+		return err
+	}
+	err = aw.AlarmDB.Delete(id, ctx)
+	if err != nil {
+		return err
+	}
+
+	err = aw.Subscription.Webhook(alarm.DeviceID, "DELETE", "ALARM", alarm)
+	// Don't want to error for a bad webhook, will just log.
+	if err != nil {
+		log.Println(err)
+	}
+	return nil
 }

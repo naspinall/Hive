@@ -16,7 +16,7 @@ type Measurement struct {
 	Type     string  `gorm:"not null"`
 	Value    float64 `gorm:"not null"`
 	Unit     string  `gorm:"not null"`
-	DeviceID int
+	DeviceID uint
 	Device   Device `json:"-"`
 }
 
@@ -36,10 +36,17 @@ type MeasurementDB interface {
 	Delete(id uint, ctx context.Context) error
 }
 
-func NewMeasurementService(db *gorm.DB) MeasurementService {
-	return &measurementGorm{
-		db: db,
-	}
+func NewMeasurementService(db *gorm.DB, Subscription SubscriptionService) MeasurementService {
+	return &measurementWebhook{
+		Subscription: Subscription,
+		MeasurementDB: &measurementGorm{
+			db: db,
+		}}
+}
+
+type measurementWebhook struct {
+	Subscription SubscriptionService
+	MeasurementDB
 }
 
 func (mg *measurementGorm) ByDevice(id uint, ctx context.Context) ([]Measurement, error) {
@@ -102,4 +109,49 @@ func (mg *measurementGorm) Callback(m *Measurement, ctx context.Context) {
 		log.Printf("Webhook successful for %s, with status %d", subscription.Url, resp.StatusCode)
 
 	}
+}
+
+func (mw *measurementWebhook) Create(alarm *Measurement, ctx context.Context) error {
+	err := mw.MeasurementDB.Create(alarm, ctx)
+	if err != nil {
+		return err
+	}
+
+	err = mw.Subscription.Webhook(alarm.DeviceID, "CREATE", "MEASUREMENT", alarm)
+	// Don't want to error for a bad webhook, will just log.
+	if err != nil {
+		log.Println(err)
+	}
+	return nil
+}
+
+func (mw *measurementWebhook) Update(measurement *Measurement, ctx context.Context) error {
+	err := mw.MeasurementDB.Update(measurement, ctx)
+	if err != nil {
+		return err
+	}
+
+	err = mw.Subscription.Webhook(measurement.DeviceID, "UPDATE", "MEASUREMENT", measurement)
+	// Don't want to error for a bad webhook, will just log.
+	if err != nil {
+		log.Println(err)
+	}
+	return nil
+}
+func (mw *measurementWebhook) Delete(id uint, ctx context.Context) error {
+	measurement, err := mw.MeasurementDB.ByID(id, ctx)
+	if err != nil {
+		return err
+	}
+	err = mw.MeasurementDB.Delete(id, ctx)
+	if err != nil {
+		return err
+	}
+
+	err = mw.Subscription.Webhook(measurement.DeviceID, "DELETE", "MEASUREMENT", measurement)
+	// Don't want to error for a bad webhook, will just log.
+	if err != nil {
+		log.Println(err)
+	}
+	return nil
 }

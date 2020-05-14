@@ -62,13 +62,13 @@ func WithLogMode(mode bool) ServicesConfig {
 
 func WithAlarms() ServicesConfig {
 	return func(s *Services) error {
-		s.Alarm = NewAlarmService(s.db)
+		s.Alarm = NewAlarmService(s.db, s.Subscription)
 		return nil
 	}
 }
 func WithMeasurements() ServicesConfig {
 	return func(s *Services) error {
-		s.Measurement = NewMeasurementService(s.db)
+		s.Measurement = NewMeasurementService(s.db, s.Subscription)
 		return nil
 	}
 }
@@ -81,6 +81,13 @@ func WithUsers(pepper string) ServicesConfig {
 func WithDevices() ServicesConfig {
 	return func(s *Services) error {
 		s.Device = NewDeviceService(s.db)
+		return nil
+	}
+}
+
+func WithSubscriptions() ServicesConfig {
+	return func(s *Services) error {
+		s.Subscription = NewSubscriptionService(s.db)
 		return nil
 	}
 }

@@ -1,15 +1,27 @@
 package models
 
 import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+
 	"github.com/jinzhu/gorm"
 )
 
 type Subscription struct {
 	gorm.Model
 	Url      string
-	Channel  string
-	DeviceID int
+	Type     string
+	Action   string
+	DeviceID uint
 	Device   Device `json:"-"`
+}
+
+type SubscriptionMessage struct {
+	DeviceID uint        `json:"deviceId"`
+	Action   string      `json:"action"`
+	Type     string      `json:"type"`
+	Payload  interface{} `json:"payload"`
 }
 
 type subscriptionGorm struct {
@@ -27,6 +39,7 @@ type SubscriptionDB interface {
 	Update(subscription *Subscription) error
 	Delete(id uint) error
 	Many() ([]*Subscription, error)
+	Webhook(deviceID uint, action, Type string, data interface{}) error
 }
 
 func NewSubscriptionService(db *gorm.DB) SubscriptionService {
@@ -34,6 +47,8 @@ func NewSubscriptionService(db *gorm.DB) SubscriptionService {
 		db: db,
 	}
 }
+
+type Webhook func(deviceID uint, action, Type string, data interface{}) error
 
 func (sg *subscriptionGorm) ByDevice(id uint) ([]Subscription, error) {
 
@@ -75,13 +90,34 @@ func (sg *subscriptionGorm) Delete(id uint) error {
 	return sg.db.Delete(subscription).Error
 }
 
-func (sg *subscriptionGorm) Webhook(deviceID uint, channel string, data interface{}) error {
+func (sg *subscriptionGorm) Webhook(deviceID uint, action, Type string, data interface{}) error {
 	var subscriptions []Subscription
-	if err := sg.db.Find(&subscriptions).Where("deviceID = ?", deviceID).Where("channel = ?", channel).Error; err != nil {
+	device := Device{Model: gorm.Model{ID: deviceID}}
+	if err := sg.db.Where("action = ?", action).Where("type = ?", Type).Model(&device).Related(&subscriptions).Error; err != nil {
 		return err
 	}
-	// for _, subscription := range subscriptions {
-	// 	b, err := json.Marshal(data)
-	// }
+
+	// Sending all data for each subscription
+	for _, subscription := range subscriptions {
+		m := SubscriptionMessage{
+			Type:     Type,
+			DeviceID: deviceID,
+			Action:   action,
+			Payload:  data,
+		}
+
+		b, err := json.Marshal(&m)
+		if err != nil {
+			return err
+		}
+
+		// Buffer for reading into request
+		buff := bytes.NewReader(b)
+		_, err = http.Post(subscription.Url, "application/json", buff)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

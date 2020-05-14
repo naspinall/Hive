@@ -13,7 +13,7 @@ for x in range(0, 25):
     kind = random.choice(types)
     for y in range(0, 1000):
         r= requests.post(
-            "http://localhost:3001/api/devices",
+            "http://localhost:3001/api/devices/",
             json={
                 "name": " ".join([place["suburb"], industry, kind, str(y)]),
                 "IMEI": str(random.randint(1, 999999999999999)),
