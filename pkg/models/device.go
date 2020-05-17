@@ -25,6 +25,10 @@ type deviceAuditLogger struct {
 	DeviceDB
 }
 
+type deviceAuthorization struct {
+	DeviceDB
+}
+
 type deviceRabbitMQ struct {
 	ch *amqp.Channel
 }
@@ -300,5 +304,64 @@ func (da *deviceAuditLogger) Delete(id uint, ctx context.Context) error {
 		return ErrNoClaims
 	}
 	LogDelete(uc.UserID, "Devices")
+	return da.DeviceDB.Delete(id, ctx)
+}
+
+func (da deviceAuthorization) ByName(name string, ctx context.Context) (*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	dr := uc.Roles.Devices
+	if err != nil || dr < 1 {
+		return nil, err
+	}
+	return da.DeviceDB.ByName(name, ctx)
+}
+func (da deviceAuthorization) ByID(id uint, ctx context.Context) (*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	dr := uc.Roles.Devices
+	if err != nil || dr < 1 {
+		return nil, err
+	}
+	return da.DeviceDB.ByID(id, ctx)
+}
+func (da deviceAuthorization) SearchByName(name string, ctx context.Context) ([]*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	dr := uc.Roles.Devices
+	if err != nil || dr < 1 {
+		return nil, err
+	}
+	return da.DeviceDB.SearchByName(name, ctx)
+}
+func (da deviceAuthorization) Many(count int, ctx context.Context) ([]*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	dr := uc.Roles.Devices
+	if err != nil || dr < 1 {
+		return nil, err
+	}
+	return da.DeviceDB.Many(count, ctx)
+}
+
+//Mutators
+func (da deviceAuthorization) Create(device *Device, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	dr := uc.Roles.Devices
+	if err != nil || dr < 2 {
+		return err
+	}
+	return da.DeviceDB.Create(device, ctx)
+}
+func (da deviceAuthorization) Update(device *Device, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	dr := uc.Roles.Devices
+	if err != nil || dr < 3 {
+		return err
+	}
+	return da.DeviceDB.Update(device, ctx)
+}
+func (da deviceAuthorization) Delete(id uint, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	dr := uc.Roles.Devices
+	if err != nil || dr < 4 {
+		return err
+	}
 	return da.DeviceDB.Delete(id, ctx)
 }

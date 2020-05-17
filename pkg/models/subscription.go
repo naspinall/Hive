@@ -2,6 +2,8 @@ package models
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 
@@ -28,17 +30,21 @@ type subscriptionGorm struct {
 	db *gorm.DB
 }
 
+type subscriptionAuthorization struct {
+	SubscriptionDB
+}
+
 type SubscriptionService interface {
 	SubscriptionDB
 }
 
 type SubscriptionDB interface {
-	ByID(id uint) (*Subscription, error)
-	ByDevice(id uint) ([]Subscription, error)
-	Create(subscription *Subscription) error
-	Update(subscription *Subscription) error
-	Delete(id uint) error
-	Many() ([]*Subscription, error)
+	ByID(id uint, ctx context.Context) (*Subscription, error)
+	ByDevice(id uint, ctx context.Context) ([]Subscription, error)
+	Create(subscription *Subscription, ctx context.Context) error
+	Update(subscription *Subscription, ctx context.Context) error
+	Delete(id uint, ctx context.Context) error
+	Many(ctx context.Context) ([]*Subscription, error)
 	Webhook(deviceID uint, action, Type string, data interface{}) error
 }
 
@@ -50,44 +56,44 @@ func NewSubscriptionService(db *gorm.DB) SubscriptionService {
 
 type Webhook func(deviceID uint, action, Type string, data interface{}) error
 
-func (sg *subscriptionGorm) ByDevice(id uint) ([]Subscription, error) {
+func (sg *subscriptionGorm) ByDevice(id uint, ctx context.Context) ([]Subscription, error) {
 
 	device := Device{Model: gorm.Model{ID: id}}
 	subscriptions := []Subscription{}
-	if err := sg.db.Model(&device).Related(&subscriptions).Error; err != nil {
+	if err := sg.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Model(&device).Related(&subscriptions).Error; err != nil {
 		return nil, err
 	}
 	return subscriptions, nil
 }
 
-func (sg *subscriptionGorm) ByID(id uint) (*Subscription, error) {
+func (sg *subscriptionGorm) ByID(id uint, ctx context.Context) (*Subscription, error) {
 	var subscription Subscription
-	if err := sg.db.Where("id = ?", id).First(&subscription).Error; err != nil {
+	if err := sg.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Where("id = ?", id).First(&subscription).Error; err != nil {
 		return nil, err
 	}
 
 	return &subscription, nil
 }
 
-func (sg *subscriptionGorm) Many() ([]*Subscription, error) {
+func (sg *subscriptionGorm) Many(ctx context.Context) ([]*Subscription, error) {
 	var subscriptions []*Subscription
-	if err := sg.db.Find(&subscriptions).Error; err != nil {
+	if err := sg.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Find(&subscriptions).Error; err != nil {
 		return nil, err
 	}
 
 	return subscriptions, nil
 }
 
-func (sg *subscriptionGorm) Create(subscription *Subscription) error {
-	return sg.db.Create(subscription).Error
+func (sg *subscriptionGorm) Create(subscription *Subscription, ctx context.Context) error {
+	return sg.db.BeginTx(ctx, &sql.TxOptions{}).Create(subscription).Error
 }
 
-func (sg *subscriptionGorm) Update(subscription *Subscription) error {
-	return sg.db.Save(subscription).Error
+func (sg *subscriptionGorm) Update(subscription *Subscription, ctx context.Context) error {
+	return sg.db.BeginTx(ctx, &sql.TxOptions{}).Save(subscription).Error
 }
-func (sg *subscriptionGorm) Delete(id uint) error {
+func (sg *subscriptionGorm) Delete(id uint, ctx context.Context) error {
 	subscription := Subscription{Model: gorm.Model{ID: id}}
-	return sg.db.Delete(subscription).Error
+	return sg.db.BeginTx(ctx, &sql.TxOptions{}).Delete(subscription).Error
 }
 
 func (sg *subscriptionGorm) Webhook(deviceID uint, action, Type string, data interface{}) error {
@@ -120,4 +126,54 @@ func (sg *subscriptionGorm) Webhook(deviceID uint, action, Type string, data int
 	}
 
 	return nil
+}
+
+func (sa subscriptionAuthorization) ByID(id uint, ctx context.Context) (*Subscription, error) {
+	uc, err := ExtractUserClaims(ctx)
+	sr := uc.Roles.Subscription
+	if err != nil || sr < 1 {
+		return nil, err
+	}
+	return sa.SubscriptionDB.ByID(id, ctx)
+}
+func (sa subscriptionAuthorization) ByDevice(id uint, ctx context.Context) ([]Subscription, error) {
+	uc, err := ExtractUserClaims(ctx)
+	sr := uc.Roles.Subscription
+	if err != nil || sr < 1 {
+		return nil, err
+	}
+	return sa.SubscriptionDB.ByDevice(id, ctx)
+}
+func (sa subscriptionAuthorization) Create(subscription *Subscription, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	sr := uc.Roles.Subscription
+	if err != nil || sr < 2 {
+		return err
+	}
+	return sa.SubscriptionDB.Create(subscription, ctx)
+}
+func (sa subscriptionAuthorization) Update(subscription *Subscription, ctx context.Context) error {
+	return sa.SubscriptionDB.Update(subscription, ctx)
+	uc, err := ExtractUserClaims(ctx)
+	sr := uc.Roles.Subscription
+	if err != nil || sr < 3 {
+		return err
+	}
+	return sa.SubscriptionDB.Update(subscription, ctx)
+}
+func (sa subscriptionAuthorization) Delete(id uint, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	sr := uc.Roles.Subscription
+	if err != nil || sr < 4 {
+		return err
+	}
+	return sa.SubscriptionDB.Delete(id, ctx)
+}
+func (sa subscriptionAuthorization) Many(ctx context.Context) ([]*Subscription, error) {
+	uc, err := ExtractUserClaims(ctx)
+	sr := uc.Roles.Subscription
+	if err != nil || sr < 1 {
+		return nil, err
+	}
+	return sa.SubscriptionDB.Many(ctx)
 }

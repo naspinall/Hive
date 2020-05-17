@@ -26,6 +26,7 @@ func main() {
 		models.WithMeasurements(),
 		models.WithDevices(),
 		models.WithAlarms(),
+		models.WithRBAC(),
 	)
 
 	if err != nil {

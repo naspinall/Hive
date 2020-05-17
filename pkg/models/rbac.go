@@ -1,137 +1,158 @@
 package models
 
-import "github.com/jinzhu/gorm"
+import (
+	"context"
+	"database/sql"
 
-type Role struct {
+	"github.com/jinzhu/gorm"
+)
+
+type AccessLevel uint
+
+type AlarmsRole struct {
 	gorm.Model
-	Name        string
-	DisplayName string
+	AccessLevel AccessLevel `gorm:"not null" json:"access"`
+	UserID      uint        `gorm:"unique_index`
+	User        User        `json:"user"`
 }
 
-type RoleAssignment struct {
+type UsersRole struct {
 	gorm.Model
-	Role   Role
-	RoleID int
-	User   User
-	UserID int
+	AccessLevel AccessLevel `gorm:"not null" json:"access"`
+	UserID      uint        `gorm:"unique_index`
+	User        User        `json:"user"`
 }
 
-type roleGorm struct {
+type MeasurementsRole struct {
+	gorm.Model
+	AccessLevel AccessLevel `gorm:"not null" json:"access"`
+	UserID      uint        `gorm:"unique_index`
+	User        User        `json:"user"`
+}
+
+type DevicesRole struct {
+	gorm.Model
+	AccessLevel AccessLevel `gorm:"not null" json:"access"`
+	UserID      uint        `gorm:"unique_index`
+	User        User        `json:"user"`
+}
+
+type SubscriptionsRole struct {
+	gorm.Model
+	AccessLevel AccessLevel `gorm:"not null" json:"access"`
+	UserID      uint        `gorm:"unique_index`
+	User        User        `json:"user"`
+}
+
+type alarmRoleGorm struct {
 	db *gorm.DB
 }
 
-type roleAssignmentGorm struct {
+type userRoleGorm struct {
 	db *gorm.DB
 }
 
-type RoleAssignmentService interface {
-	ByUser(user *User) ([]Role, error)
-	ByRole(role *Role) ([]Role, error)
-	CreateAssignment(user *User, role *Role) (*RoleAssignment, error)
-
-	Create(*RoleAssignment) error
-	Update(*RoleAssignment) error
-	Delete(*RoleAssignment) error
-
-	Close() error
-	AutoMigrate() error
-	DestructiveReset() error
+type measurementRoleGorm struct {
+	db *gorm.DB
 }
 
-type RoleService interface {
-	ById(id uint) (*Role, error)
-	ByName(name string) (*Role, error)
-
-	Create(role *Role)
-	Update(role *Role)
-	Delete(role *Role)
-
-	Close() error
-	AutoMigrate() error
-	DestructiveReset() error
+type deviceRoleGorm struct {
+	db *gorm.DB
 }
 
-func (rg *roleGorm) ById(id uint) (*Role, error) {
-	var role Role
-	if err := rg.db.Where("id = ?", id).First(&role).Error; err != nil {
-		return nil, err
+type subscriptionsGorm struct {
+	db *gorm.DB
+}
+
+type RBACService struct {
+	Alarms        *alarmRoleGorm
+	Users         *userRoleGorm
+	Measurements  *measurementRoleGorm
+	Devices       *deviceRoleGorm
+	Subscriptions *subscriptionsGorm
+}
+
+func NewRBACService(db *gorm.DB) *RBACService {
+	return &RBACService{
+		Alarms: &alarmRoleGorm{
+			db: db,
+		},
+		Users: &userRoleGorm{
+			db: db,
+		},
+		Measurements: &measurementRoleGorm{
+			db: db,
+		},
+		Devices: &deviceRoleGorm{
+			db: db,
+		},
+		Subscriptions: &subscriptionsGorm{
+			db: db,
+		},
 	}
-	return &role, nil
-}
-func (rg *roleGorm) ByName(name string) (*Role, error) {
-	var role Role
-	if err := rg.db.Where("name = ?", name).First(&role).Error; err != nil {
-		return nil, err
-	}
-	return &role, nil
 }
 
-func (rg *roleGorm) Create(role *Role) error {
-	return rg.db.Create(role).Error
-}
-func (rg *roleGorm) Update(role *Role) error {
-	return rg.db.Save(role).Error
-
-}
-func (rg *roleGorm) Delete(id uint) error {
-	role := Role{Model: gorm.Model{ID: id}}
-	return rg.db.Delete(role).Error
+func (arg *alarmRoleGorm) Assign(role *AlarmsRole, ctx context.Context) error {
+	return arg.db.BeginTx(ctx, &sql.TxOptions{}).Create(role).Error
 }
 
-func (rg *roleGorm) Close() error {
-	return rg.db.Close()
-}
-func (rg *roleGorm) AutoMigrate() error {
-	return rg.db.AutoMigrate(&Role{}).Error
-}
-func (rg *roleGorm) DestructiveReset() error {
-	if err := rg.db.DropTable(&Role{}).Error; err != nil {
-		return err
+func (arg *alarmRoleGorm) ByUserID(userID uint, ctx context.Context) (AccessLevel, error) {
+	var alarmRole AlarmsRole
+	user := &User{Model: gorm.Model{ID: userID}}
+	if err := arg.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Model(&user).Related(&alarmRole).Error; err != nil {
+		return AccessLevel(0), err
 	}
-
-	return rg.AutoMigrate()
+	return alarmRole.AccessLevel, nil
 }
 
-func (rag *roleAssignmentGorm) ByUser(user *User) ([]RoleAssignment, error) {
-	var roles []RoleAssignment
-	if err := rag.db.Model(&RoleAssignment{}).Related(user).Find(roles).Error; err != nil {
-		return nil, err
+func (urg *userRoleGorm) Assign(role *UsersRole, ctx context.Context) error {
+	return urg.db.BeginTx(ctx, &sql.TxOptions{}).Create(role).Error
+}
+
+func (urg *userRoleGorm) ByUserID(userID uint, ctx context.Context) (AccessLevel, error) {
+	var userRole UsersRole
+	user := &User{Model: gorm.Model{ID: userID}}
+	if err := urg.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Model(&user).Related(&userRole).Error; err != nil {
+		return AccessLevel(0), err
 	}
-	return roles, nil
+	return userRole.AccessLevel, nil
 }
-func (rag *roleAssignmentGorm) ByRole(role *Role) ([]RoleAssignment, error) {
-	var roles []RoleAssignment
-	if err := rag.db.Model(&role).Related(&roles).Error; err != nil {
-		return nil, err
+
+func (mrg *measurementRoleGorm) Assign(role *MeasurementsRole, ctx context.Context) error {
+	return mrg.db.BeginTx(ctx, &sql.TxOptions{}).Create(role).Error
+}
+
+func (mrg *measurementRoleGorm) ByUserID(userID uint, ctx context.Context) (AccessLevel, error) {
+	var measurementRole MeasurementsRole
+	user := &User{Model: gorm.Model{ID: userID}}
+	if err := mrg.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Model(&user).Related(&measurementRole).Error; err != nil {
+		return AccessLevel(0), err
 	}
-	return roles, nil
+	return measurementRole.AccessLevel, nil
 }
-func (rag *roleAssignmentGorm) CreateAssignment(user *User, role *Role) error {
-	roleAssignment := RoleAssignment{
-		User: *user,
-		Role: *role,
+
+func (srg *subscriptionsGorm) Assign(role *SubscriptionsRole, ctx context.Context) error {
+	return srg.db.BeginTx(ctx, &sql.TxOptions{}).Create(role).Error
+}
+
+func (srg *subscriptionsGorm) ByUserID(userID uint, ctx context.Context) (AccessLevel, error) {
+	var subscriptionRole SubscriptionsRole
+	user := &User{Model: gorm.Model{ID: userID}}
+	if err := srg.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Model(&user).Related(&subscriptionRole).Error; err != nil {
+		return AccessLevel(0), err
 	}
-	return rag.Create(&roleAssignment)
+	return subscriptionRole.AccessLevel, nil
 }
-func (rag *roleAssignmentGorm) Create(ra *RoleAssignment) error {
-	return rag.db.Create(ra).Error
+
+func (drg *deviceRoleGorm) Assign(role *DevicesRole, ctx context.Context) error {
+	return drg.db.BeginTx(ctx, &sql.TxOptions{}).Create(role).Error
 }
-func (rag *roleAssignmentGorm) Update(ra *RoleAssignment) error {
-	return rag.db.Save(ra).Error
-}
-func (rag *roleAssignmentGorm) Delete(id uint) error {
-	roleAssignment := RoleAssignment{Model: gorm.Model{ID: id}}
-	return rag.db.Delete(roleAssignment).Error
-}
-func (rag *roleAssignmentGorm) Close() error {
-	return rag.db.Close()
-}
-func (rag *roleAssignmentGorm) AutoMigrate() error {
-	return rag.db.AutoMigrate(&RoleAssignment{}).Error
-}
-func (rag *roleAssignmentGorm) DestructiveReset() error {
-	if err := rag.db.DropTable(&RoleAssignment{}).Error; err != nil {
-		return err
+
+func (drg *deviceRoleGorm) ByUserID(userID uint, ctx context.Context) (AccessLevel, error) {
+	var deviceRole DevicesRole
+	user := &User{Model: gorm.Model{ID: userID}}
+	if err := drg.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Model(&user).Related(&deviceRole).Error; err != nil {
+		return AccessLevel(0), err
 	}
-	return rag.AutoMigrate()
+	return deviceRole.AccessLevel, nil
 }

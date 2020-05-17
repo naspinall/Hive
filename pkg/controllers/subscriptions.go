@@ -44,7 +44,7 @@ func (s *Subscriptions) Create(w http.ResponseWriter, r *http.Request) {
 
 	subscription.DeviceID = uint(id)
 
-	if err = s.ss.Create(&subscription); err != nil {
+	if err = s.ss.Create(&subscription, r.Context()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -58,7 +58,7 @@ func (s *Subscriptions) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Subscriptions) GetMany(w http.ResponseWriter, r *http.Request) {
-	subscriptions, err := s.ss.Many()
+	subscriptions, err := s.ss.Many(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -80,7 +80,7 @@ func (s *Subscriptions) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.ss.Delete(uint(id)); err != nil {
+	if err := s.ss.Delete(uint(id), r.Context()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

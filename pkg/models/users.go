@@ -48,12 +48,25 @@ type User struct {
 type UserClaims struct {
 	UserID uint `json:"userId"`
 	jwt.StandardClaims
+	Roles RoleClaims `json:"roles"`
+}
+
+type RoleClaims struct {
+	Alarms       AccessLevel `json:"ALARMS"`
+	Devices      AccessLevel `json:"DEVICES"`
+	Users        AccessLevel `json:"USERS"`
+	Measurements AccessLevel `json:"MEASUREMENTS"`
+	Subscription AccessLevel `json:"SUBSCRIPTIONS"`
 }
 
 type userGorm struct {
 	db     *gorm.DB
 	pepper string
 	jwtKey string
+}
+
+type userAuthorization struct {
+	UserDB
 }
 
 // User Interfaces
@@ -383,4 +396,56 @@ func ExtractUserClaims(ctx context.Context) (*UserClaims, error) {
 		return claims, nil
 	}
 	return nil, ErrInvalidClaims
+}
+
+func (ua userAuthorization) ByID(id uint, ctx context.Context) (*User, error) {
+	uc, err := ExtractUserClaims(ctx)
+	ur := uc.Roles.Users
+
+	// Allow a user to view their own role
+	if (err != nil || ur < 1) && uc.UserID != id {
+		return nil, err
+	}
+	return ua.UserDB.ByID(id, ctx)
+}
+func (ua userAuthorization) ByEmail(email string, ctx context.Context) (*User, error) {
+	uc, err := ExtractUserClaims(ctx)
+	ur := uc.Roles.Users
+	if err != nil || ur < 1 {
+		return nil, err
+	}
+	return ua.UserDB.ByEmail(email, ctx)
+}
+
+func (ua userAuthorization) Create(user *User, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	ur := uc.Roles.Users
+	if err != nil || ur < 2 {
+		return err
+	}
+	return ua.UserDB.Create(user, ctx)
+}
+func (ua userAuthorization) Update(user *User, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	ur := uc.Roles.Users
+	if err != nil || ur < 3 {
+		return err
+	}
+	return ua.UserDB.Update(user, ctx)
+}
+func (ua userAuthorization) Delete(id uint, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	ur := uc.Roles.Users
+	if err != nil || ur < 4 {
+		return err
+	}
+	return ua.UserDB.Delete(id, ctx)
+}
+func (ua userAuthorization) Many(ctx context.Context) ([]*User, error) {
+	uc, err := ExtractUserClaims(ctx)
+	ur := uc.Roles.Users
+	if err != nil || ur < 1 {
+		return nil, err
+	}
+	return ua.UserDB.Many(ctx)
 }

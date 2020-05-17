@@ -40,6 +40,10 @@ type alarmWebhook struct {
 	AlarmDB
 }
 
+type alarmAuthorization struct {
+	AlarmDB
+}
+
 func NewAlarmService(db *gorm.DB, Subscription SubscriptionService) AlarmService {
 	return &alarmWebhook{
 		Subscription: Subscription,
@@ -133,4 +137,53 @@ func (aw *alarmWebhook) Delete(id uint, ctx context.Context) error {
 		log.Println(err)
 	}
 	return nil
+}
+
+func (aa alarmAuthorization) ByID(id uint, ctx context.Context) (*Alarm, error) {
+	uc, err := ExtractUserClaims(ctx)
+	ar := uc.Roles.Alarms
+	if err != nil || ar < 1 {
+		return nil, err
+	}
+	return aa.AlarmDB.ByID(id, ctx)
+}
+func (aa alarmAuthorization) ByDevice(id uint, ctx context.Context) ([]Alarm, error) {
+	uc, err := ExtractUserClaims(ctx)
+	ar := uc.Roles.Alarms
+	if err != nil || ar < 1 {
+		return nil, err
+	}
+	return aa.AlarmDB.ByDevice(id, ctx)
+}
+func (aa alarmAuthorization) Create(alarm *Alarm, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	ar := uc.Roles.Alarms
+	if err != nil || ar < 2 {
+		return err
+	}
+	return aa.AlarmDB.Create(alarm, ctx)
+}
+func (aa alarmAuthorization) Update(alarm *Alarm, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	ar := uc.Roles.Alarms
+	if err != nil || ar < 3 {
+		return err
+	}
+	return aa.AlarmDB.Update(alarm, ctx)
+}
+func (aa alarmAuthorization) Delete(id uint, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	ar := uc.Roles.Alarms
+	if err != nil || ar < 4 {
+		return err
+	}
+	return aa.AlarmDB.Delete(id, ctx)
+}
+func (aa alarmAuthorization) Many(count int, ctx context.Context) ([]*Alarm, error) {
+	uc, err := ExtractUserClaims(ctx)
+	ar := uc.Roles.Alarms
+	if err != nil || ar < 1 {
+		return nil, err
+	}
+	return aa.AlarmDB.Many(count, ctx)
 }

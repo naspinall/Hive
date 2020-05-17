@@ -24,6 +24,14 @@ type measurementGorm struct {
 	db *gorm.DB
 }
 
+type measurementAuditLogger struct {
+	MeasurementDB
+}
+
+type measurementAuthorization struct {
+	MeasurementDB
+}
+
 type MeasurementService interface {
 	MeasurementDB
 }
@@ -39,8 +47,10 @@ type MeasurementDB interface {
 func NewMeasurementService(db *gorm.DB, Subscription SubscriptionService) MeasurementService {
 	return &measurementWebhook{
 		Subscription: Subscription,
-		MeasurementDB: &measurementGorm{
-			db: db,
+		MeasurementDB: &measurementAuditLogger{
+			&measurementGorm{
+				db: db,
+			},
 		}}
 }
 
@@ -154,4 +164,93 @@ func (mw *measurementWebhook) Delete(id uint, ctx context.Context) error {
 		log.Println(err)
 	}
 	return nil
+}
+
+//Getters
+
+func (ma *measurementAuditLogger) ByID(id uint, ctx context.Context) (*Measurement, error) {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return nil, ErrNoClaims
+	}
+	LogGet(uc.UserID, "Measurements")
+	return ma.MeasurementDB.ByID(id, ctx)
+}
+
+//Mutators
+func (ma *measurementAuditLogger) Create(measurement *Measurement, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return ErrNoClaims
+	}
+	LogCreate(uc.UserID, "Measurements")
+	return ma.MeasurementDB.Create(measurement, ctx)
+}
+
+func (ma *measurementAuditLogger) Update(measurement *Measurement, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return ErrNoClaims
+	}
+	LogUpdate(uc.UserID, "Measurements")
+	return ma.MeasurementDB.Update(measurement, ctx)
+}
+
+func (ma *measurementAuditLogger) Delete(id uint, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return ErrNoClaims
+	}
+	LogDelete(uc.UserID, "Measurements")
+	return ma.MeasurementDB.Delete(id, ctx)
+}
+
+func (ma *measurementAuditLogger) ByDevice(id uint, ctx context.Context) ([]Measurement, error) {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return nil, ErrNoClaims
+	}
+	LogDelete(uc.UserID, "Measurements")
+	return ma.MeasurementDB.ByDevice(id, ctx)
+}
+
+func (ma *measurementAuthorization) ByID(id uint, ctx context.Context) (*Measurement, error) {
+	uc, err := ExtractUserClaims(ctx)
+	ar := uc.Roles.Measurements
+	if err != nil || ar < 1 {
+		return nil, err
+	}
+	return ma.MeasurementDB.ByID(id, ctx)
+}
+func (ma *measurementAuthorization) ByDevice(id uint, ctx context.Context) ([]Measurement, error) {
+	uc, err := ExtractUserClaims(ctx)
+	ar := uc.Roles.Measurements
+	if err != nil || ar < 1 {
+		return nil, err
+	}
+	return ma.MeasurementDB.ByDevice(id, ctx)
+}
+func (ma *measurementAuthorization) Create(measurement *Measurement, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	ar := uc.Roles.Measurements
+	if err != nil || ar < 2 {
+		return err
+	}
+	return ma.MeasurementDB.Create(measurement, ctx)
+}
+func (ma *measurementAuthorization) Update(measurement *Measurement, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	ar := uc.Roles.Measurements
+	if err != nil || ar < 3 {
+		return err
+	}
+	return ma.MeasurementDB.Update(measurement, ctx)
+}
+func (ma *measurementAuthorization) Delete(id uint, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	ar := uc.Roles.Measurements
+	if err != nil || ar < 4 {
+		return err
+	}
+	return ma.MeasurementDB.Delete(id, ctx)
 }
