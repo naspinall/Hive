@@ -21,6 +21,10 @@ type deviceGorm struct {
 	db *gorm.DB
 }
 
+type deviceAuditLogger struct {
+	DeviceDB
+}
+
 type deviceRabbitMQ struct {
 	ch *amqp.Channel
 }
@@ -30,13 +34,13 @@ type DeviceDB interface {
 	//Getters
 	ByName(name string, ctx context.Context) (*Device, error)
 	ByID(id uint, ctx context.Context) (*Device, error)
+	SearchByName(name string, ctx context.Context) ([]*Device, error)
+	Many(count int, ctx context.Context) ([]*Device, error)
 
 	//Mutators
 	Create(device *Device, ctx context.Context) error
 	Update(device *Device, ctx context.Context) error
 	Delete(id uint, ctx context.Context) error
-	Many(count int, ctx context.Context) ([]*Device, error)
-	SearchByName(name string, ctx context.Context) ([]*Device, error)
 }
 
 type DeviceMultiplexer struct {
@@ -78,30 +82,17 @@ func newDeviceRabbitMQ(connectionInfo string) (*deviceRabbitMQ, error) {
 	}, nil
 }
 
-func newDeviceGorm(connectionInfo string) (*deviceGorm, error) {
-
-	//Creating database connection
-	db, err := gorm.Open("postgres", connectionInfo)
-	if err != nil {
-		return nil, err
-	}
-	//Setting logmode to get more verbose logs from the database layer.
-	db.LogMode(true)
-
-	return &deviceGorm{
-		db: db,
-	}, nil
-
-}
-
 func NewDeviceService(db *gorm.DB) DeviceService {
 	return &deviceService{
-		&deviceGorm{db: db},
+		&deviceAuditLogger{
+			&deviceGorm{db: db},
+		},
 	}
 }
 
 //Getters
 func (dg *deviceGorm) Many(count int, ctx context.Context) ([]*Device, error) {
+
 	var devices []*Device
 
 	err := dg.db.BeginTx(ctx, &sql.TxOptions{}).Limit(count).Find(&devices).Error
@@ -250,4 +241,64 @@ func (dm *DeviceMultiplexer) Close() error {
 	}
 
 	return nil
+}
+
+//Getters
+func (da *deviceAuditLogger) ByName(name string, ctx context.Context) (*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return nil, ErrNoClaims
+	}
+	LogGet(uc.UserID, "Devices")
+	return da.DeviceDB.ByName(name, ctx)
+}
+func (da *deviceAuditLogger) ByID(id uint, ctx context.Context) (*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return nil, ErrNoClaims
+	}
+	LogGet(uc.UserID, "Devices")
+	return da.DeviceDB.ByID(id, ctx)
+}
+func (da *deviceAuditLogger) SearchByName(name string, ctx context.Context) ([]*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return nil, ErrNoClaims
+	}
+	LogGet(uc.UserID, "Devices")
+	return da.DeviceDB.SearchByName(name, ctx)
+}
+func (da *deviceAuditLogger) Many(count int, ctx context.Context) ([]*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return nil, ErrNoClaims
+	}
+	LogGet(uc.UserID, "Devices")
+	return da.DeviceDB.Many(count, ctx)
+}
+
+//Mutators
+func (da *deviceAuditLogger) Create(device *Device, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return ErrNoClaims
+	}
+	LogCreate(uc.UserID, "Devices")
+	return da.DeviceDB.Create(device, ctx)
+}
+func (da *deviceAuditLogger) Update(device *Device, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return ErrNoClaims
+	}
+	LogUpdate(uc.UserID, "Devices")
+	return da.DeviceDB.Update(device, ctx)
+}
+func (da *deviceAuditLogger) Delete(id uint, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return ErrNoClaims
+	}
+	LogDelete(uc.UserID, "Devices")
+	return da.DeviceDB.Delete(id, ctx)
 }

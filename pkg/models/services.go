@@ -72,9 +72,9 @@ func WithMeasurements() ServicesConfig {
 		return nil
 	}
 }
-func WithUsers(pepper string) ServicesConfig {
+func WithUsers(pepper string, jwtKey string) ServicesConfig {
 	return func(s *Services) error {
-		s.User = NewUserService(s.db, pepper)
+		s.User = NewUserService(s.db, pepper, jwtKey)
 		return nil
 	}
 }

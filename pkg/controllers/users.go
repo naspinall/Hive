@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/naspinall/Hive/pkg/models"
 )
+
+type LoginResponse struct {
+	Token string `json:"token"`
+}
 
 type Users struct {
 	us models.UserService
@@ -91,20 +93,8 @@ func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := u.signJWT(fu)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	cookie := http.Cookie{
-		Name:     "token",
-		Value:    token,
-		HttpOnly: true,
-	}
-
-	http.SetCookie(w, &cookie)
-	err = json.NewEncoder(w).Encode(&user)
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(&fu)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -124,17 +114,4 @@ func (u *Users) GetMany(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-}
-
-func (u *Users) signJWT(user *models.User) (string, error) {
-	claims := models.UserClaims{
-		UserID: user.ID,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Hour * 2).Unix(),
-			Issuer:    "Hive",
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
-	return token.SignedString([]byte("JWTSecretReallySecret"))
 }
