@@ -14,12 +14,14 @@ type LoginResponse struct {
 }
 
 type Users struct {
-	us models.UserService
+	us    models.UserService
+	rbacs models.RBACService
 }
 
-func NewUsers(us models.UserService) *Users {
+func NewUsers(us models.UserService, rbac models.RBACService) *Users {
 	return &Users{
-		us: us,
+		us:    us,
+		rbacs: rbac,
 	}
 }
 
@@ -33,6 +35,20 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := u.us.Create(&user, r.Context()); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	defaultRole := models.Role{
+		Alarms:        0,
+		Measurements:  0,
+		Users:         0,
+		Devices:       0,
+		Subscriptions: 0,
+		UserID:        user.ID,
+	}
+
+	if err := u.rbacs.Assign(&defaultRole, r.Context()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -114,4 +130,46 @@ func (u *Users) GetMany(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+
+func (u *Users) GetRoles(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.ParseUint(vars["id"], 10, 32)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	role, err := u.rbacs.ByUserID(uint(id), r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(&role)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+}
+
+func (u *Users) AssignRole(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.ParseUint(vars["id"], 10, 32)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var role models.Role
+	if err := json.NewDecoder(r.Body).Decode(&role); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	role.UserID = uint(id)
+
+	u.rbacs.Assign(&role, r.Context())
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 }

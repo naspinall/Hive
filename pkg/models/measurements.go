@@ -3,7 +3,6 @@ package models
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -63,7 +62,7 @@ func (mg *measurementGorm) ByDevice(id uint, ctx context.Context) ([]Measurement
 
 	device := Device{Model: gorm.Model{ID: id}}
 	measurements := []Measurement{}
-	if err := mg.db.BeginTx(ctx, &sql.TxOptions{}).Model(&device).Related(&measurements).Error; err != nil {
+	if err := mg.db.Model(&device).Related(&measurements).Error; err != nil {
 		return nil, err
 	}
 	return measurements, nil
@@ -71,7 +70,7 @@ func (mg *measurementGorm) ByDevice(id uint, ctx context.Context) ([]Measurement
 
 func (mg *measurementGorm) ByID(id uint, ctx context.Context) (*Measurement, error) {
 	var measurement Measurement
-	if err := mg.db.BeginTx(ctx, &sql.TxOptions{}).Where("id = ?", id).First(&measurement).Error; err != nil {
+	if err := mg.db.Where("id = ?", id).First(&measurement).Error; err != nil {
 		return nil, err
 	}
 
@@ -79,7 +78,7 @@ func (mg *measurementGorm) ByID(id uint, ctx context.Context) (*Measurement, err
 }
 
 func (mg *measurementGorm) Create(measurement *Measurement, ctx context.Context) error {
-	err := mg.db.BeginTx(ctx, &sql.TxOptions{}).Create(measurement).Error
+	err := mg.db.Create(measurement).Error
 	if err != nil {
 		return err
 	}
@@ -88,18 +87,18 @@ func (mg *measurementGorm) Create(measurement *Measurement, ctx context.Context)
 }
 
 func (mg *measurementGorm) Update(measurement *Measurement, ctx context.Context) error {
-	return mg.db.BeginTx(ctx, &sql.TxOptions{}).Save(measurement).Error
+	return mg.db.Save(measurement).Error
 }
 func (mg *measurementGorm) Delete(id uint, ctx context.Context) error {
 	measurement := Measurement{Model: gorm.Model{ID: id}}
-	return mg.db.BeginTx(ctx, &sql.TxOptions{}).Delete(measurement).Error
+	return mg.db.Delete(measurement).Error
 }
 
 func (mg *measurementGorm) Callback(m *Measurement, ctx context.Context) {
 	var subscriptions []*Subscription
 	device := Device{Model: gorm.Model{ID: uint(m.DeviceID)}}
 
-	err := mg.db.BeginTx(ctx, &sql.TxOptions{}).Model(&device).Related(&subscriptions).Error
+	err := mg.db.Model(&device).Related(&subscriptions).Error
 	if err != nil {
 		log.Println("Cannot Load Subscriptions")
 	}

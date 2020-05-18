@@ -13,7 +13,7 @@ type Services struct {
 	Measurement  MeasurementService
 	User         UserService
 	Subscription SubscriptionService
-	RBAC         *RBACService
+	RBAC         RBACService
 	db           *gorm.DB
 }
 
@@ -28,11 +28,11 @@ func NewServices(cfgs ...ServicesConfig) (*Services, error) {
 }
 
 func (s *Services) AutoMigrate() error {
-	return s.db.AutoMigrate(&User{}, &Alarm{}, &Measurement{}, &Device{}, &Subscription{}, &AlarmsRole{}, &UsersRole{}, &MeasurementsRole{}, &DevicesRole{}, &SubscriptionsRole{}).Error
+	return s.db.AutoMigrate(&User{}, &Alarm{}, &Measurement{}, &Device{}, &Subscription{}, &Role{}).Error
 }
 
 func (s *Services) DestructiveReset() error {
-	if err := s.db.DropTable(&User{}, &Alarm{}, &Measurement{}, &Device{}).Error; err != nil {
+	if err := s.db.DropTable(&User{}, &Alarm{}, &Measurement{}, &Device{}, &Subscription{}, &Role{}).Error; err != nil {
 		return err
 	}
 	return s.AutoMigrate()

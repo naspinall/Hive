@@ -48,15 +48,7 @@ type User struct {
 type UserClaims struct {
 	UserID uint `json:"userId"`
 	jwt.StandardClaims
-	Roles RoleClaims `json:"roles"`
-}
-
-type RoleClaims struct {
-	Alarms       AccessLevel `json:"ALARMS"`
-	Devices      AccessLevel `json:"DEVICES"`
-	Users        AccessLevel `json:"USERS"`
-	Measurements AccessLevel `json:"MEASUREMENTS"`
-	Subscription AccessLevel `json:"SUBSCRIPTIONS"`
+	Roles Role `json:"roles"`
 }
 
 type userGorm struct {
@@ -133,7 +125,7 @@ func newUserGorm(connectionString string) (*userGorm, error) {
 // Implementing the UserDB Interface
 func (ug *userGorm) ByID(id uint, ctx context.Context) (*User, error) {
 	var user User
-	if err := ug.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Where("id = ?", id).First(&user).Error; err != nil {
+	if err := ug.db.Where("id = ?", id).First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil

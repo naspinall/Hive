@@ -33,9 +33,10 @@ func main() {
 		log.Fatal(err)
 	}
 	defer services.Close()
+	services.DestructiveReset()
 	services.AutoMigrate()
 
-	usersC := controllers.NewUsers(services.User)
+	usersC := controllers.NewUsers(services.User, services.RBAC)
 	devicesC := controllers.NewDevices(services.Device)
 	measurementsC := controllers.NewMeasurements(services.Measurement)
 	alarmsC := controllers.NewAlarms(services.Alarm)
@@ -69,6 +70,8 @@ func main() {
 	u.HandleFunc("/", usersC.GetMany).Methods("GET")
 	u.HandleFunc("/{id}/", usersC.Delete).Methods("DELETE")
 	u.HandleFunc("/{id}/", usersC.Get).Methods("GET")
+	u.HandleFunc("/{id}/roles", usersC.GetRoles).Methods("GET")
+	u.HandleFunc("/{id}/roles", usersC.AssignRole).Methods("PUT")
 
 	//Measurement CRUD
 	m := api.PathPrefix("/measurements").Subrouter()

@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 
 	"github.com/jinzhu/gorm"
@@ -99,7 +98,7 @@ func (dg *deviceGorm) Many(count int, ctx context.Context) ([]*Device, error) {
 
 	var devices []*Device
 
-	err := dg.db.BeginTx(ctx, &sql.TxOptions{}).Limit(count).Find(&devices).Error
+	err := dg.db.Limit(count).Find(&devices).Error
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +109,7 @@ func (dg *deviceGorm) ByName(name string, ctx context.Context) (*Device, error) 
 
 	var device Device
 	//Getting Device from database.
-	err := dg.db.BeginTx(ctx, &sql.TxOptions{}).Where("name = ?", name).First(&device).Error
+	err := dg.db.Where("name = ?", name).First(&device).Error
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +120,7 @@ func (dg *deviceGorm) ByName(name string, ctx context.Context) (*Device, error) 
 func (dg *deviceGorm) ByID(id uint, ctx context.Context) (*Device, error) {
 	var device Device
 	//Getting Device from database.
-	err := dg.db.BeginTx(ctx, &sql.TxOptions{}).Where("id = ?", id).First(&device).Error
+	err := dg.db.Where("id = ?", id).First(&device).Error
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +130,7 @@ func (dg *deviceGorm) ByID(id uint, ctx context.Context) (*Device, error) {
 
 func (dg *deviceGorm) SearchByName(name string, ctx context.Context) ([]*Device, error) {
 	var devices []*Device
-	if err := dg.db.BeginTx(ctx, &sql.TxOptions{}).Where("name LIKE ?", "%"+name+"%").Find(&devices).Error; err != nil {
+	if err := dg.db.Where("name LIKE ?", "%"+name+"%").Find(&devices).Error; err != nil {
 		return nil, err
 	}
 	return devices, nil
@@ -139,18 +138,18 @@ func (dg *deviceGorm) SearchByName(name string, ctx context.Context) ([]*Device,
 
 //Mutators
 func (dg *deviceGorm) Create(device *Device, ctx context.Context) (err error) {
-	err = dg.db.BeginTx(ctx, &sql.TxOptions{}).Create(device).Error
+	err = dg.db.Create(device).Error
 	return
 }
 
 func (dg *deviceGorm) Update(device *Device, ctx context.Context) (err error) {
-	err = dg.db.BeginTx(ctx, &sql.TxOptions{}).Save(device).Error
+	err = dg.db.Save(device).Error
 	return
 }
 
 func (dg *deviceGorm) Delete(id uint, ctx context.Context) (err error) {
 	device := Device{Model: gorm.Model{ID: id}}
-	err = dg.db.BeginTx(ctx, &sql.TxOptions{}).Delete(&device).Error
+	err = dg.db.Delete(&device).Error
 	return
 }
 

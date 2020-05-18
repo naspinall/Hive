@@ -83,15 +83,15 @@ func (ag *alarmGorm) Many(count int, ctx context.Context) ([]*Alarm, error) {
 }
 
 func (ag *alarmGorm) Create(alarm *Alarm, ctx context.Context) error {
-	return ag.db.BeginTx(ctx, &sql.TxOptions{}).Create(alarm).Error
+	return ag.db.Create(alarm).Error
 }
 
 func (ag *alarmGorm) Update(alarm *Alarm, ctx context.Context) error {
-	return ag.db.BeginTx(ctx, &sql.TxOptions{}).Save(alarm).Error
+	return ag.db.Save(alarm).Error
 }
 func (ag *alarmGorm) Delete(id uint, ctx context.Context) error {
 	alarm := Alarm{Model: gorm.Model{ID: id}}
-	return ag.db.BeginTx(ctx, &sql.TxOptions{}).Delete(alarm).Error
+	return ag.db.Delete(alarm).Error
 }
 
 func (aw *alarmWebhook) Create(alarm *Alarm, ctx context.Context) error {
