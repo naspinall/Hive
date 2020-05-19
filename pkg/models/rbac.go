@@ -37,7 +37,7 @@ func (rg *rbacGorm) Assign(role *Role, ctx context.Context) error {
 	if rg.db.Model(&user).Related(&Role{}).RecordNotFound() {
 		return rg.db.Create(role).Error
 	}
-	return rg.db.Save(role).Error
+	return rg.db.Model(role).Updates(role).Error
 }
 
 func (rg *rbacGorm) ByUserID(id uint, ctx context.Context) (*Role, error) {
