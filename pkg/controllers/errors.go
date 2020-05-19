@@ -1,19 +1,31 @@
 package controllers
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/naspinall/Hive/pkg/models"
 )
 
+type ErrorResponse struct {
+	Message string `json:"message"`
+	Status  int    `json:"status"`
+}
+
 func Unauthorized(w http.ResponseWriter, err models.ErrorUnauthorized) {
-	http.Error(w, err.Error(), http.StatusUnauthorized)
+	er := ErrorResponse{Message: err.Error(), Status: http.StatusUnauthorized}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(er)
 }
 func NotFound(w http.ResponseWriter, err models.ErrorNotFound) {
-	http.Error(w, err.Error(), http.StatusNotFound)
+	er := ErrorResponse{Message: err.Error(), Status: http.StatusNotFound}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(er)
 }
 func InternalServerError(w http.ResponseWriter, err error) {
-	http.Error(w, err.Error(), http.StatusInternalServerError)
+	er := ErrorResponse{Message: err.Error(), Status: http.StatusInternalServerError}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(er)
 }
 
 func BadRequest(w http.ResponseWriter, err error) {
