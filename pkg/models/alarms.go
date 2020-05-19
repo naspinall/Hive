@@ -45,10 +45,12 @@ type alarmAuthorization struct {
 }
 
 func NewAlarmService(db *gorm.DB, Subscription SubscriptionService) AlarmService {
-	return &alarmWebhook{
-		Subscription: Subscription,
-		AlarmDB: &alarmGorm{
-			db: db,
+	return &alarmAuthorization{
+		&alarmWebhook{
+			Subscription: Subscription,
+			AlarmDB: &alarmGorm{
+				db: db,
+			},
 		},
 	}
 }
@@ -141,49 +143,49 @@ func (aw *alarmWebhook) Delete(id uint, ctx context.Context) error {
 
 func (aa alarmAuthorization) ByID(id uint, ctx context.Context) (*Alarm, error) {
 	uc, err := ExtractUserClaims(ctx)
-	ar := uc.Roles.Alarms
+	ar := uc.Role.Alarms
 	if err != nil || ar < 1 {
-		return nil, err
+		return nil, ErrAlarmsReadRequired
 	}
 	return aa.AlarmDB.ByID(id, ctx)
 }
 func (aa alarmAuthorization) ByDevice(id uint, ctx context.Context) ([]Alarm, error) {
 	uc, err := ExtractUserClaims(ctx)
-	ar := uc.Roles.Alarms
+	ar := uc.Role.Alarms
 	if err != nil || ar < 1 {
-		return nil, err
+		return nil, ErrAlarmsReadRequired
 	}
 	return aa.AlarmDB.ByDevice(id, ctx)
 }
 func (aa alarmAuthorization) Create(alarm *Alarm, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
-	ar := uc.Roles.Alarms
+	ar := uc.Role.Alarms
 	if err != nil || ar < 2 {
-		return err
+		return ErrAlarmsWriteRequired
 	}
 	return aa.AlarmDB.Create(alarm, ctx)
 }
 func (aa alarmAuthorization) Update(alarm *Alarm, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
-	ar := uc.Roles.Alarms
+	ar := uc.Role.Alarms
 	if err != nil || ar < 3 {
-		return err
+		return ErrAlarmsUpdateRequired
 	}
 	return aa.AlarmDB.Update(alarm, ctx)
 }
 func (aa alarmAuthorization) Delete(id uint, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
-	ar := uc.Roles.Alarms
+	ar := uc.Role.Alarms
 	if err != nil || ar < 4 {
-		return err
+		return ErrAlarmsDeleteRequired
 	}
 	return aa.AlarmDB.Delete(id, ctx)
 }
 func (aa alarmAuthorization) Many(count int, ctx context.Context) ([]*Alarm, error) {
 	uc, err := ExtractUserClaims(ctx)
-	ar := uc.Roles.Alarms
+	ar := uc.Role.Alarms
 	if err != nil || ar < 1 {
-		return nil, err
+		return nil, ErrAlarmsReadRequired
 	}
 	return aa.AlarmDB.Many(count, ctx)
 }

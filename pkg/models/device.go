@@ -87,8 +87,10 @@ func newDeviceRabbitMQ(connectionInfo string) (*deviceRabbitMQ, error) {
 
 func NewDeviceService(db *gorm.DB) DeviceService {
 	return &deviceService{
-		&deviceAuditLogger{
-			&deviceGorm{db: db},
+		&deviceAuthorization{
+			&deviceAuditLogger{
+				&deviceGorm{db: db},
+			},
 		},
 	}
 }
@@ -308,7 +310,7 @@ func (da *deviceAuditLogger) Delete(id uint, ctx context.Context) error {
 
 func (da deviceAuthorization) ByName(name string, ctx context.Context) (*Device, error) {
 	uc, err := ExtractUserClaims(ctx)
-	dr := uc.Roles.Devices
+	dr := uc.Role.Devices
 	if err != nil || dr < 1 {
 		return nil, err
 	}
@@ -316,25 +318,25 @@ func (da deviceAuthorization) ByName(name string, ctx context.Context) (*Device,
 }
 func (da deviceAuthorization) ByID(id uint, ctx context.Context) (*Device, error) {
 	uc, err := ExtractUserClaims(ctx)
-	dr := uc.Roles.Devices
+	dr := uc.Role.Devices
 	if err != nil || dr < 1 {
-		return nil, err
+		return nil, ErrDeviceReadRequired
 	}
 	return da.DeviceDB.ByID(id, ctx)
 }
 func (da deviceAuthorization) SearchByName(name string, ctx context.Context) ([]*Device, error) {
 	uc, err := ExtractUserClaims(ctx)
-	dr := uc.Roles.Devices
+	dr := uc.Role.Devices
 	if err != nil || dr < 1 {
-		return nil, err
+		return nil, ErrDeviceReadRequired
 	}
 	return da.DeviceDB.SearchByName(name, ctx)
 }
 func (da deviceAuthorization) Many(count int, ctx context.Context) ([]*Device, error) {
 	uc, err := ExtractUserClaims(ctx)
-	dr := uc.Roles.Devices
+	dr := uc.Role.Devices
 	if err != nil || dr < 1 {
-		return nil, err
+		return nil, ErrDeviceReadRequired
 	}
 	return da.DeviceDB.Many(count, ctx)
 }
@@ -342,25 +344,25 @@ func (da deviceAuthorization) Many(count int, ctx context.Context) ([]*Device, e
 //Mutators
 func (da deviceAuthorization) Create(device *Device, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
-	dr := uc.Roles.Devices
+	dr := uc.Role.Devices
 	if err != nil || dr < 2 {
-		return err
+		return ErrDeviceWriteRequired
 	}
 	return da.DeviceDB.Create(device, ctx)
 }
 func (da deviceAuthorization) Update(device *Device, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
-	dr := uc.Roles.Devices
+	dr := uc.Role.Devices
 	if err != nil || dr < 3 {
-		return err
+		return ErrDeviceUpdateRequired
 	}
 	return da.DeviceDB.Update(device, ctx)
 }
 func (da deviceAuthorization) Delete(id uint, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
-	dr := uc.Roles.Devices
+	dr := uc.Role.Devices
 	if err != nil || dr < 4 {
-		return err
+		return ErrDeviceDeleteRequired
 	}
 	return da.DeviceDB.Delete(id, ctx)
 }

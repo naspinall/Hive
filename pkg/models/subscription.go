@@ -49,8 +49,10 @@ type SubscriptionDB interface {
 }
 
 func NewSubscriptionService(db *gorm.DB) SubscriptionService {
-	return &subscriptionGorm{
-		db: db,
+	return &subscriptionAuthorization{
+		&subscriptionGorm{
+			db: db,
+		},
 	}
 }
 
@@ -130,50 +132,50 @@ func (sg *subscriptionGorm) Webhook(deviceID uint, action, Type string, data int
 
 func (sa subscriptionAuthorization) ByID(id uint, ctx context.Context) (*Subscription, error) {
 	uc, err := ExtractUserClaims(ctx)
-	sr := uc.Roles.Subscriptions
+	sr := uc.Role.Subscriptions
 	if err != nil || sr < 1 {
-		return nil, err
+		return nil, ErrSubscriptionsReadRequired
 	}
 	return sa.SubscriptionDB.ByID(id, ctx)
 }
 func (sa subscriptionAuthorization) ByDevice(id uint, ctx context.Context) ([]Subscription, error) {
 	uc, err := ExtractUserClaims(ctx)
-	sr := uc.Roles.Subscriptions
+	sr := uc.Role.Subscriptions
 	if err != nil || sr < 1 {
-		return nil, err
+		return nil, ErrSubscriptionsReadRequired
 	}
 	return sa.SubscriptionDB.ByDevice(id, ctx)
 }
 func (sa subscriptionAuthorization) Create(subscription *Subscription, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
-	sr := uc.Roles.Subscriptions
+	sr := uc.Role.Subscriptions
 	if err != nil || sr < 2 {
-		return err
+		return ErrSubscriptionsWriteRequired
 	}
 	return sa.SubscriptionDB.Create(subscription, ctx)
 }
 func (sa subscriptionAuthorization) Update(subscription *Subscription, ctx context.Context) error {
 	return sa.SubscriptionDB.Update(subscription, ctx)
 	uc, err := ExtractUserClaims(ctx)
-	sr := uc.Roles.Subscriptions
+	sr := uc.Role.Subscriptions
 	if err != nil || sr < 3 {
-		return err
+		return ErrSubscriptionsUpdateRequired
 	}
 	return sa.SubscriptionDB.Update(subscription, ctx)
 }
 func (sa subscriptionAuthorization) Delete(id uint, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
-	sr := uc.Roles.Subscriptions
+	sr := uc.Role.Subscriptions
 	if err != nil || sr < 4 {
-		return err
+		return ErrSubscriptionsDeleteRequired
 	}
 	return sa.SubscriptionDB.Delete(id, ctx)
 }
 func (sa subscriptionAuthorization) Many(ctx context.Context) ([]*Subscription, error) {
 	uc, err := ExtractUserClaims(ctx)
-	sr := uc.Roles.Subscriptions
+	sr := uc.Role.Subscriptions
 	if err != nil || sr < 1 {
-		return nil, err
+		return nil, ErrSubscriptionsReadRequired
 	}
 	return sa.SubscriptionDB.Many(ctx)
 }

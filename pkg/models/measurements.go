@@ -44,13 +44,16 @@ type MeasurementDB interface {
 }
 
 func NewMeasurementService(db *gorm.DB, Subscription SubscriptionService) MeasurementService {
-	return &measurementWebhook{
-		Subscription: Subscription,
-		MeasurementDB: &measurementAuditLogger{
-			&measurementGorm{
-				db: db,
+	return &measurementAuthorization{
+		&measurementWebhook{
+			Subscription: Subscription,
+			MeasurementDB: &measurementAuditLogger{
+				&measurementGorm{
+					db: db,
+				},
 			},
-		}}
+		},
+	}
 }
 
 type measurementWebhook struct {
@@ -215,41 +218,41 @@ func (ma *measurementAuditLogger) ByDevice(id uint, ctx context.Context) ([]Meas
 
 func (ma *measurementAuthorization) ByID(id uint, ctx context.Context) (*Measurement, error) {
 	uc, err := ExtractUserClaims(ctx)
-	ar := uc.Roles.Measurements
+	ar := uc.Role.Measurements
 	if err != nil || ar < 1 {
-		return nil, err
+		return nil, ErrMeasurementReadRequired
 	}
 	return ma.MeasurementDB.ByID(id, ctx)
 }
 func (ma *measurementAuthorization) ByDevice(id uint, ctx context.Context) ([]Measurement, error) {
 	uc, err := ExtractUserClaims(ctx)
-	ar := uc.Roles.Measurements
+	ar := uc.Role.Measurements
 	if err != nil || ar < 1 {
-		return nil, err
+		return nil, ErrMeasurementReadRequired
 	}
 	return ma.MeasurementDB.ByDevice(id, ctx)
 }
 func (ma *measurementAuthorization) Create(measurement *Measurement, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
-	ar := uc.Roles.Measurements
+	ar := uc.Role.Measurements
 	if err != nil || ar < 2 {
-		return err
+		return ErrMeasurementWriteRequired
 	}
 	return ma.MeasurementDB.Create(measurement, ctx)
 }
 func (ma *measurementAuthorization) Update(measurement *Measurement, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
-	ar := uc.Roles.Measurements
+	ar := uc.Role.Measurements
 	if err != nil || ar < 3 {
-		return err
+		return ErrMeasurementUpdateRequired
 	}
 	return ma.MeasurementDB.Update(measurement, ctx)
 }
 func (ma *measurementAuthorization) Delete(id uint, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
-	ar := uc.Roles.Measurements
+	ar := uc.Role.Measurements
 	if err != nil || ar < 4 {
-		return err
+		return ErrMeasurementDeleteRequired
 	}
 	return ma.MeasurementDB.Delete(id, ctx)
 }

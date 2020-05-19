@@ -48,7 +48,7 @@ type User struct {
 type UserClaims struct {
 	UserID uint `json:"userId"`
 	jwt.StandardClaims
-	Roles Role `json:"roles"`
+	Role Role `json:"role"`
 }
 
 type userGorm struct {
@@ -366,8 +366,15 @@ func (uv *userGorm) AcceptToken(user *User, ctx context.Context) (context.Contex
 
 func (ug *userGorm) signToken(user *User) error {
 	var err error
+	var role Role
+
+	if err := ug.db.Model(user).Find(&role).Error; err != nil {
+		return err
+	}
+
 	claims := UserClaims{
 		UserID: user.ID,
+		Role:   role,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(time.Hour * 2).Unix(),
 			Issuer:    "Hive",
@@ -392,52 +399,53 @@ func ExtractUserClaims(ctx context.Context) (*UserClaims, error) {
 
 func (ua userAuthorization) ByID(id uint, ctx context.Context) (*User, error) {
 	uc, err := ExtractUserClaims(ctx)
-	ur := uc.Roles.Users
+	ur := uc.Role.Users
 
 	// Allow a user to view their own role
 	if (err != nil || ur < 1) && uc.UserID != id {
-		return nil, err
+		return nil, ErrUsersReadRequired
 	}
 	return ua.UserDB.ByID(id, ctx)
 }
 func (ua userAuthorization) ByEmail(email string, ctx context.Context) (*User, error) {
 	uc, err := ExtractUserClaims(ctx)
-	ur := uc.Roles.Users
+	ur := uc.Role.Users
 	if err != nil || ur < 1 {
-		return nil, err
+		return nil, ErrUsersReadRequired
 	}
 	return ua.UserDB.ByEmail(email, ctx)
 }
 
 func (ua userAuthorization) Create(user *User, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
-	ur := uc.Roles.Users
+	ur := uc.Role.Users
 	if err != nil || ur < 2 {
-		return err
+		return ErrUsersWriteRequired
 	}
 	return ua.UserDB.Create(user, ctx)
 }
 func (ua userAuthorization) Update(user *User, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
-	ur := uc.Roles.Users
+	ur := uc.Role.Users
 	if err != nil || ur < 3 {
-		return err
+		return ErrUsersUpdateRequired
 	}
 	return ua.UserDB.Update(user, ctx)
 }
 func (ua userAuthorization) Delete(id uint, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
-	ur := uc.Roles.Users
+	ur := uc.Role.Users
 	if err != nil || ur < 4 {
-		return err
+		return ErrUsersDeleteRequired
 	}
 	return ua.UserDB.Delete(id, ctx)
 }
 func (ua userAuthorization) Many(ctx context.Context) ([]*User, error) {
 	uc, err := ExtractUserClaims(ctx)
-	ur := uc.Roles.Users
+	ur := uc.Role.Users
+
 	if err != nil || ur < 1 {
-		return nil, err
+		return nil, ErrUsersReadRequired
 	}
 	return ua.UserDB.Many(ctx)
 }

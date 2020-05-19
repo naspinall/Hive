@@ -30,7 +30,7 @@ func (s *Subscriptions) Create(w http.ResponseWriter, r *http.Request) {
 	} else {
 		id, err = strconv.ParseInt(vars["id"], 10, 64)
 		if err != nil {
-			http.Error(w, "Bad ID", http.StatusBadRequest)
+			ProcessError(w, models.ErrInvalidID)
 			return
 		}
 	}
@@ -38,21 +38,21 @@ func (s *Subscriptions) Create(w http.ResponseWriter, r *http.Request) {
 	var subscription models.Subscription
 	err = json.NewDecoder(r.Body).Decode(&subscription)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		ProcessError(w, err)
 		return
 	}
 
 	subscription.DeviceID = uint(id)
 
 	if err = s.ss.Create(&subscription, r.Context()); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&subscription)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 }
@@ -60,14 +60,14 @@ func (s *Subscriptions) Create(w http.ResponseWriter, r *http.Request) {
 func (s *Subscriptions) GetMany(w http.ResponseWriter, r *http.Request) {
 	subscriptions, err := s.ss.Many(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(subscriptions)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 }
@@ -76,12 +76,12 @@ func (s *Subscriptions) Delete(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, models.ErrInvalidID)
 		return
 	}
 
 	if err := s.ss.Delete(uint(id), r.Context()); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

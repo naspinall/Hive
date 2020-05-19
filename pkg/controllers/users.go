@@ -30,12 +30,12 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 
 	if err := u.us.Create(&user, r.Context()); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 
@@ -49,7 +49,7 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := u.rbacs.Assign(&defaultRole, r.Context()); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 
@@ -62,12 +62,12 @@ func (u *Users) Delete(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, models.ErrInvalidID)
 		return
 	}
 
 	if err := u.us.Delete(uint(id), r.Context()); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -77,20 +77,20 @@ func (u *Users) Get(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 
 	user, err := u.us.ByID(uint(id), r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&user)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 }
@@ -99,7 +99,7 @@ func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 
@@ -112,7 +112,7 @@ func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&fu)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 }
@@ -120,13 +120,13 @@ func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
 func (u *Users) GetMany(w http.ResponseWriter, r *http.Request) {
 	users, err := u.us.Many(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&users)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 
@@ -136,18 +136,19 @@ func (u *Users) GetRoles(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		ProcessError(w, models.ErrInvalidID)
+		return
 	}
 
 	role, err := u.rbacs.ByUserID(uint(id), r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&role)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 
@@ -157,13 +158,13 @@ func (u *Users) AssignRole(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		ProcessError(w, models.ErrInvalidID)
 		return
 	}
 
 	var role models.Role
 	if err := json.NewDecoder(r.Body).Decode(&role); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		ProcessError(w, err)
 		return
 	}
 	role.UserID = uint(id)
