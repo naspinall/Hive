@@ -4,20 +4,24 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/naspinall/Hive/pkg/models"
 )
 
-type Users struct {
-	us models.UserService
+type LoginResponse struct {
+	Token string `json:"token"`
 }
 
-func NewUsers(us models.UserService) *Users {
+type Users struct {
+	us    models.UserService
+	rbacs models.RBACService
+}
+
+func NewUsers(us models.UserService, rbac models.RBACService) *Users {
 	return &Users{
-		us: us,
+		us:    us,
+		rbacs: rbac,
 	}
 }
 
@@ -26,12 +30,26 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 
 	if err := u.us.Create(&user, r.Context()); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
+		return
+	}
+
+	defaultRole := models.Role{
+		Alarms:        0,
+		Measurements:  0,
+		Users:         0,
+		Devices:       0,
+		Subscriptions: 0,
+		UserID:        user.ID,
+	}
+
+	if err := u.rbacs.Assign(&defaultRole, r.Context()); err != nil {
+		ProcessError(w, err)
 		return
 	}
 
@@ -44,12 +62,12 @@ func (u *Users) Delete(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, models.ErrInvalidID)
 		return
 	}
 
 	if err := u.us.Delete(uint(id), r.Context()); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -59,20 +77,20 @@ func (u *Users) Get(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 
 	user, err := u.us.ByID(uint(id), r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&user)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 }
@@ -81,7 +99,7 @@ func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 
@@ -91,49 +109,68 @@ func (u *Users) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := u.signJWT(fu)
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(&fu)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
-	}
-
-	cookie := http.Cookie{
-		Name:     "token",
-		Value:    token,
-		HttpOnly: true,
-	}
-
-	http.SetCookie(w, &cookie)
-	err = json.NewEncoder(w).Encode(&user)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (u *Users) GetMany(w http.ResponseWriter, r *http.Request) {
 	users, err := u.us.Many(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&users)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
 		return
 	}
 
 }
 
-func (u *Users) signJWT(user *models.User) (string, error) {
-	claims := models.UserClaims{
-		UserID: user.ID,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Hour * 2).Unix(),
-			Issuer:    "Hive",
-		},
+func (u *Users) GetRoles(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.ParseUint(vars["id"], 10, 32)
+	if err != nil {
+		ProcessError(w, models.ErrInvalidID)
+		return
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
-	return token.SignedString([]byte("JWTSecretReallySecret"))
+	role, err := u.rbacs.ByUserID(uint(id), r.Context())
+	if err != nil {
+		ProcessError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(&role)
+	if err != nil {
+		ProcessError(w, err)
+		return
+	}
+
+}
+
+func (u *Users) AssignRole(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.ParseUint(vars["id"], 10, 32)
+	if err != nil {
+		ProcessError(w, models.ErrInvalidID)
+		return
+	}
+
+	var role models.Role
+	if err := json.NewDecoder(r.Body).Decode(&role); err != nil {
+		ProcessError(w, err)
+		return
+	}
+	role.UserID = uint(id)
+
+	u.rbacs.Assign(&role, r.Context())
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 }

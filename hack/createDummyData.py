@@ -11,15 +11,15 @@ for x in range(0, 25):
     place = random.choice(places)
     industry = random.choice(industries)
     kind = random.choice(types)
-    for y in range(0, 1000):
+    for y in range(0, 10):
         r= requests.post(
-            "http://localhost:3001/api/devices",
+            "http://localhost:3001/api/devices/",
             json={
                 "name": " ".join([place["suburb"], industry, kind, str(y)]),
                 "IMEI": str(random.randint(1, 999999999999999)),
                 "latitude": -random.uniform(0.001, 0.000001) + place["latitude"],
                 "longitude": random.uniform(0.001, 0.000001) + place["longitude"],
-            }
+            },headers={"Authorization": "Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImV4cCI6MTU4OTcxODY4MCwiaXNzIjoiSGl2ZSJ9.yJqm9wF0o5ju3YE7k-GM1Oi6YliMPOIk-8mRmcjz-4XEtxgcl4HgkImVt9pAJ4LLvLAL_OsWFk8OsIZgbuHicA"}
         )
 
 # for x in range(0, 100):

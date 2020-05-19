@@ -13,6 +13,7 @@ type Services struct {
 	Measurement  MeasurementService
 	User         UserService
 	Subscription SubscriptionService
+	RBAC         RBACService
 	db           *gorm.DB
 }
 
@@ -27,11 +28,11 @@ func NewServices(cfgs ...ServicesConfig) (*Services, error) {
 }
 
 func (s *Services) AutoMigrate() error {
-	return s.db.AutoMigrate(&User{}, &Alarm{}, &Measurement{}, &Device{}, &Subscription{}).Error
+	return s.db.AutoMigrate(&User{}, &Alarm{}, &Measurement{}, &Device{}, &Subscription{}, &Role{}).Error
 }
 
 func (s *Services) DestructiveReset() error {
-	if err := s.db.DropTable(&User{}, &Alarm{}, &Measurement{}, &Device{}).Error; err != nil {
+	if err := s.db.DropTable(&User{}, &Alarm{}, &Measurement{}, &Device{}, &Subscription{}, &Role{}).Error; err != nil {
 		return err
 	}
 	return s.AutoMigrate()
@@ -62,25 +63,39 @@ func WithLogMode(mode bool) ServicesConfig {
 
 func WithAlarms() ServicesConfig {
 	return func(s *Services) error {
-		s.Alarm = NewAlarmService(s.db)
+		s.Alarm = NewAlarmService(s.db, s.Subscription)
 		return nil
 	}
 }
 func WithMeasurements() ServicesConfig {
 	return func(s *Services) error {
-		s.Measurement = NewMeasurementService(s.db)
+		s.Measurement = NewMeasurementService(s.db, s.Subscription)
 		return nil
 	}
 }
-func WithUsers(pepper string) ServicesConfig {
+func WithUsers(pepper string, jwtKey string) ServicesConfig {
 	return func(s *Services) error {
-		s.User = NewUserService(s.db, pepper)
+		s.User = NewUserService(s.db, pepper, jwtKey)
 		return nil
 	}
 }
 func WithDevices() ServicesConfig {
 	return func(s *Services) error {
 		s.Device = NewDeviceService(s.db)
+		return nil
+	}
+}
+
+func WithSubscriptions() ServicesConfig {
+	return func(s *Services) error {
+		s.Subscription = NewSubscriptionService(s.db)
+		return nil
+	}
+}
+
+func WithRBAC() ServicesConfig {
+	return func(s *Services) error {
+		s.RBAC = NewRBACService(s.db)
 		return nil
 	}
 }

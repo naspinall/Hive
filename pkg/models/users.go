@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"regexp"
+	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/jinzhu/gorm"
@@ -11,6 +12,7 @@ import (
 )
 
 type modelError string
+type userContextKey string
 
 func (e modelError) Error() string {
 	return string(e)
@@ -26,6 +28,10 @@ const (
 	ErrPasswordRequired    modelError = "Password is required"
 	ErrBadLogin            modelError = "Invalid Password or Email"
 	ErrDisplayNameRequired modelError = "Display Name Required"
+	ErrTokenRequired       modelError = "Auth Token Required"
+	ErrInvalidClaims       modelError = "Invalid Token Claims"
+	ErrInvalidToken        modelError = "Invalid Token"
+	ErrNoClaims            modelError = "No Claims"
 )
 
 // User Structs
@@ -33,20 +39,26 @@ const (
 type User struct {
 	gorm.Model
 	Email        string `gorm:"not null;unique_index" json:"email"`
-	Password     string `gorm:"not null"  json:"password,omitempty"`
+	Password     string `gorm:"-" json:"password,omitempty"`
 	PasswordHash string `gorm:"not null"  json:"-"`
 	DisplayName  string `gorm:"not null"  json:"displayName"`
+	Token        string `gorm:"-" json:"token,omitempty"`
 }
 
 type UserClaims struct {
 	UserID uint `json:"userId"`
 	jwt.StandardClaims
+	Role Role `json:"role"`
 }
 
 type userGorm struct {
 	db     *gorm.DB
 	pepper string
 	jwtKey string
+}
+
+type userAuthorization struct {
+	UserDB
 }
 
 // User Interfaces
@@ -63,6 +75,7 @@ type UserDB interface {
 	Delete(id uint, ctx context.Context) error
 	Authenticate(email, password string, ctx context.Context) (*User, error)
 	Many(ctx context.Context) ([]*User, error)
+	AcceptToken(user *User, ctx context.Context) (context.Context, error)
 }
 
 type userValFunc func(*User) error
@@ -76,11 +89,12 @@ type userValidator struct {
 	UserDB
 	emailRegex    *regexp.Regexp
 	passwordRegex *regexp.Regexp
+	tokenRegex    *regexp.Regexp
 	pepper        string
 }
 
-func NewUserService(db *gorm.DB, pepper string) UserService {
-	ug := &userGorm{db: db, pepper: pepper}
+func NewUserService(db *gorm.DB, pepper, jwtKey string) UserService {
+	ug := &userGorm{db: db, pepper: pepper, jwtKey: jwtKey}
 	uv := newUserValidator(ug, pepper)
 	return &userService{
 		UserDB: uv,
@@ -92,6 +106,7 @@ func newUserValidator(udb UserDB, pepper string) *userValidator {
 		UserDB:     udb,
 		emailRegex: regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,16}$`),
 		pepper:     pepper,
+		tokenRegex: regexp.MustCompile(`Bearer ([A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*)`),
 	}
 
 }
@@ -110,7 +125,7 @@ func newUserGorm(connectionString string) (*userGorm, error) {
 // Implementing the UserDB Interface
 func (ug *userGorm) ByID(id uint, ctx context.Context) (*User, error) {
 	var user User
-	if err := ug.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Where("id = ?", id).First(&user).Error; err != nil {
+	if err := ug.db.Where("id = ?", id).First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -136,6 +151,7 @@ func (uv *userValidator) ByEmail(email string, ctx context.Context) (*User, erro
 func (ug *userGorm) Authenticate(email, password string, ctx context.Context) (*User, error) {
 
 	u, err := ug.ByEmail(email, ctx)
+
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +163,11 @@ func (ug *userGorm) Authenticate(email, password string, ctx context.Context) (*
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(toBeCompared)); err != nil {
 		return nil, err
 	}
+
+	if err := ug.signToken(u); err != nil {
+		return nil, err
+	}
+
 	return u, nil
 
 }
@@ -284,4 +305,147 @@ func (uv *userValidator) validPassword(user *User) error {
 	}
 
 	return ErrPasswordInvalid
+}
+
+func (uv *userValidator) hasToken(user *User) error {
+	if user.Token == "" {
+		return ErrTokenRequired
+	}
+
+	return nil
+}
+
+func (uv *userValidator) validToken(user *User) error {
+	if user.Token == "" {
+		return nil
+	}
+
+	matches := uv.tokenRegex.FindStringSubmatch(user.Token)
+	if len(matches) > 1 {
+
+		user.Token = matches[1]
+		return nil
+	}
+
+	return ErrTokenRequired
+
+}
+
+func (uv *userValidator) AcceptToken(user *User, ctx context.Context) (context.Context, error) {
+	if err := uv.runUserValFns(user, uv.hasToken, uv.validToken); err != nil {
+		return ctx, err
+	}
+
+	return uv.UserDB.AcceptToken(user, ctx)
+}
+
+func (uv *userGorm) AcceptToken(user *User, ctx context.Context) (context.Context, error) {
+	uc := &UserClaims{}
+
+	token, err := jwt.ParseWithClaims(
+		user.Token,
+		uc,
+		func(token *jwt.Token) (interface{}, error) {
+			return []byte(uv.jwtKey), nil
+		},
+	)
+
+	if err != nil {
+		return ctx, err
+	}
+
+	// Setting claims to context TODO do this better, don't need the entire claims in context
+	claims, ok := token.Claims.(*UserClaims)
+	if !ok {
+		return ctx, ErrInvalidClaims
+	}
+
+	claimsContext := context.WithValue(ctx, userContextKey("User"), claims)
+	return claimsContext, nil
+}
+
+func (ug *userGorm) signToken(user *User) error {
+	var err error
+	var role Role
+
+	if err := ug.db.Model(user).Find(&role).Error; err != nil {
+		return err
+	}
+
+	claims := UserClaims{
+		UserID: user.ID,
+		Role:   role,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(time.Hour * 2).Unix(),
+			Issuer:    "Hive",
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, &claims)
+	if user.Token, err = token.SignedString([]byte(ug.jwtKey)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ExtractUserClaims(ctx context.Context) (*UserClaims, error) {
+	claims, ok := ctx.Value(userContextKey("User")).(*UserClaims)
+	if ok {
+		return claims, nil
+	}
+	return nil, ErrInvalidClaims
+}
+
+func (ua userAuthorization) ByID(id uint, ctx context.Context) (*User, error) {
+	uc, err := ExtractUserClaims(ctx)
+	ur := uc.Role.Users
+
+	// Allow a user to view their own role
+	if (err != nil || ur < 1) && uc.UserID != id {
+		return nil, ErrUsersReadRequired
+	}
+	return ua.UserDB.ByID(id, ctx)
+}
+func (ua userAuthorization) ByEmail(email string, ctx context.Context) (*User, error) {
+	uc, err := ExtractUserClaims(ctx)
+	ur := uc.Role.Users
+	if err != nil || ur < 1 {
+		return nil, ErrUsersReadRequired
+	}
+	return ua.UserDB.ByEmail(email, ctx)
+}
+
+func (ua userAuthorization) Create(user *User, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	ur := uc.Role.Users
+	if err != nil || ur < 2 {
+		return ErrUsersWriteRequired
+	}
+	return ua.UserDB.Create(user, ctx)
+}
+func (ua userAuthorization) Update(user *User, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	ur := uc.Role.Users
+	if err != nil || ur < 3 {
+		return ErrUsersUpdateRequired
+	}
+	return ua.UserDB.Update(user, ctx)
+}
+func (ua userAuthorization) Delete(id uint, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	ur := uc.Role.Users
+	if err != nil || ur < 4 {
+		return ErrUsersDeleteRequired
+	}
+	return ua.UserDB.Delete(id, ctx)
+}
+func (ua userAuthorization) Many(ctx context.Context) ([]*User, error) {
+	uc, err := ExtractUserClaims(ctx)
+	ur := uc.Role.Users
+
+	if err != nil || ur < 1 {
+		return nil, ErrUsersReadRequired
+	}
+	return ua.UserDB.Many(ctx)
 }

@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 
 	"github.com/jinzhu/gorm"
@@ -21,6 +20,14 @@ type deviceGorm struct {
 	db *gorm.DB
 }
 
+type deviceAuditLogger struct {
+	DeviceDB
+}
+
+type deviceAuthorization struct {
+	DeviceDB
+}
+
 type deviceRabbitMQ struct {
 	ch *amqp.Channel
 }
@@ -30,13 +37,13 @@ type DeviceDB interface {
 	//Getters
 	ByName(name string, ctx context.Context) (*Device, error)
 	ByID(id uint, ctx context.Context) (*Device, error)
+	SearchByName(name string, ctx context.Context) ([]*Device, error)
+	Many(count int, ctx context.Context) ([]*Device, error)
 
 	//Mutators
 	Create(device *Device, ctx context.Context) error
 	Update(device *Device, ctx context.Context) error
 	Delete(id uint, ctx context.Context) error
-	Many(count int, ctx context.Context) ([]*Device, error)
-	SearchByName(name string, ctx context.Context) ([]*Device, error)
 }
 
 type DeviceMultiplexer struct {
@@ -78,33 +85,22 @@ func newDeviceRabbitMQ(connectionInfo string) (*deviceRabbitMQ, error) {
 	}, nil
 }
 
-func newDeviceGorm(connectionInfo string) (*deviceGorm, error) {
-
-	//Creating database connection
-	db, err := gorm.Open("postgres", connectionInfo)
-	if err != nil {
-		return nil, err
-	}
-	//Setting logmode to get more verbose logs from the database layer.
-	db.LogMode(true)
-
-	return &deviceGorm{
-		db: db,
-	}, nil
-
-}
-
 func NewDeviceService(db *gorm.DB) DeviceService {
 	return &deviceService{
-		&deviceGorm{db: db},
+		&deviceAuthorization{
+			&deviceAuditLogger{
+				&deviceGorm{db: db},
+			},
+		},
 	}
 }
 
 //Getters
 func (dg *deviceGorm) Many(count int, ctx context.Context) ([]*Device, error) {
+
 	var devices []*Device
 
-	err := dg.db.BeginTx(ctx, &sql.TxOptions{}).Limit(count).Find(&devices).Error
+	err := dg.db.Limit(count).Find(&devices).Error
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +111,7 @@ func (dg *deviceGorm) ByName(name string, ctx context.Context) (*Device, error) 
 
 	var device Device
 	//Getting Device from database.
-	err := dg.db.BeginTx(ctx, &sql.TxOptions{}).Where("name = ?", name).First(&device).Error
+	err := dg.db.Where("name = ?", name).First(&device).Error
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +122,7 @@ func (dg *deviceGorm) ByName(name string, ctx context.Context) (*Device, error) 
 func (dg *deviceGorm) ByID(id uint, ctx context.Context) (*Device, error) {
 	var device Device
 	//Getting Device from database.
-	err := dg.db.BeginTx(ctx, &sql.TxOptions{}).Where("id = ?", id).First(&device).Error
+	err := dg.db.Where("id = ?", id).First(&device).Error
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +132,7 @@ func (dg *deviceGorm) ByID(id uint, ctx context.Context) (*Device, error) {
 
 func (dg *deviceGorm) SearchByName(name string, ctx context.Context) ([]*Device, error) {
 	var devices []*Device
-	if err := dg.db.BeginTx(ctx, &sql.TxOptions{}).Where("name LIKE ?", "%"+name+"%").Find(&devices).Error; err != nil {
+	if err := dg.db.Where("name LIKE ?", "%"+name+"%").Find(&devices).Error; err != nil {
 		return nil, err
 	}
 	return devices, nil
@@ -144,18 +140,18 @@ func (dg *deviceGorm) SearchByName(name string, ctx context.Context) ([]*Device,
 
 //Mutators
 func (dg *deviceGorm) Create(device *Device, ctx context.Context) (err error) {
-	err = dg.db.BeginTx(ctx, &sql.TxOptions{}).Create(device).Error
+	err = dg.db.Create(device).Error
 	return
 }
 
 func (dg *deviceGorm) Update(device *Device, ctx context.Context) (err error) {
-	err = dg.db.BeginTx(ctx, &sql.TxOptions{}).Save(device).Error
+	err = dg.db.Save(device).Error
 	return
 }
 
 func (dg *deviceGorm) Delete(id uint, ctx context.Context) (err error) {
 	device := Device{Model: gorm.Model{ID: id}}
-	err = dg.db.BeginTx(ctx, &sql.TxOptions{}).Delete(&device).Error
+	err = dg.db.Delete(&device).Error
 	return
 }
 
@@ -250,4 +246,123 @@ func (dm *DeviceMultiplexer) Close() error {
 	}
 
 	return nil
+}
+
+//Getters
+func (da *deviceAuditLogger) ByName(name string, ctx context.Context) (*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return nil, ErrNoClaims
+	}
+	LogGet(uc.UserID, "Devices")
+	return da.DeviceDB.ByName(name, ctx)
+}
+func (da *deviceAuditLogger) ByID(id uint, ctx context.Context) (*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return nil, ErrNoClaims
+	}
+	LogGet(uc.UserID, "Devices")
+	return da.DeviceDB.ByID(id, ctx)
+}
+func (da *deviceAuditLogger) SearchByName(name string, ctx context.Context) ([]*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return nil, ErrNoClaims
+	}
+	LogGet(uc.UserID, "Devices")
+	return da.DeviceDB.SearchByName(name, ctx)
+}
+func (da *deviceAuditLogger) Many(count int, ctx context.Context) ([]*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return nil, ErrNoClaims
+	}
+	LogGet(uc.UserID, "Devices")
+	return da.DeviceDB.Many(count, ctx)
+}
+
+//Mutators
+func (da *deviceAuditLogger) Create(device *Device, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return ErrNoClaims
+	}
+	LogCreate(uc.UserID, "Devices")
+	return da.DeviceDB.Create(device, ctx)
+}
+func (da *deviceAuditLogger) Update(device *Device, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return ErrNoClaims
+	}
+	LogUpdate(uc.UserID, "Devices")
+	return da.DeviceDB.Update(device, ctx)
+}
+func (da *deviceAuditLogger) Delete(id uint, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return ErrNoClaims
+	}
+	LogDelete(uc.UserID, "Devices")
+	return da.DeviceDB.Delete(id, ctx)
+}
+
+func (da deviceAuthorization) ByName(name string, ctx context.Context) (*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	dr := uc.Role.Devices
+	if err != nil || dr < 1 {
+		return nil, err
+	}
+	return da.DeviceDB.ByName(name, ctx)
+}
+func (da deviceAuthorization) ByID(id uint, ctx context.Context) (*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	dr := uc.Role.Devices
+	if err != nil || dr < 1 {
+		return nil, ErrDeviceReadRequired
+	}
+	return da.DeviceDB.ByID(id, ctx)
+}
+func (da deviceAuthorization) SearchByName(name string, ctx context.Context) ([]*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	dr := uc.Role.Devices
+	if err != nil || dr < 1 {
+		return nil, ErrDeviceReadRequired
+	}
+	return da.DeviceDB.SearchByName(name, ctx)
+}
+func (da deviceAuthorization) Many(count int, ctx context.Context) ([]*Device, error) {
+	uc, err := ExtractUserClaims(ctx)
+	dr := uc.Role.Devices
+	if err != nil || dr < 1 {
+		return nil, ErrDeviceReadRequired
+	}
+	return da.DeviceDB.Many(count, ctx)
+}
+
+//Mutators
+func (da deviceAuthorization) Create(device *Device, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	dr := uc.Role.Devices
+	if err != nil || dr < 2 {
+		return ErrDeviceWriteRequired
+	}
+	return da.DeviceDB.Create(device, ctx)
+}
+func (da deviceAuthorization) Update(device *Device, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	dr := uc.Role.Devices
+	if err != nil || dr < 3 {
+		return ErrDeviceUpdateRequired
+	}
+	return da.DeviceDB.Update(device, ctx)
+}
+func (da deviceAuthorization) Delete(id uint, ctx context.Context) error {
+	uc, err := ExtractUserClaims(ctx)
+	dr := uc.Role.Devices
+	if err != nil || dr < 4 {
+		return ErrDeviceDeleteRequired
+	}
+	return da.DeviceDB.Delete(id, ctx)
 }

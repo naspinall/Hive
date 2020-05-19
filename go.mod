@@ -7,6 +7,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/eclipse/paho.mqtt.golang v1.2.0
 	github.com/gogo/protobuf v1.3.1 // indirect
+	github.com/golang/protobuf v1.4.1
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
@@ -23,4 +24,6 @@ require (
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271
 	golang.org/x/crypto v0.0.0-20191010185427-af544f31c8ac
 	google.golang.org/appengine v1.6.5 // indirect
+	google.golang.org/grpc v1.29.1
+	google.golang.org/protobuf v1.22.0
 )

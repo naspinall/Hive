@@ -25,11 +25,13 @@ func (d *Devices) Create(w http.ResponseWriter, r *http.Request) {
 	var device models.Device
 	err := json.NewDecoder(r.Body).Decode(&device)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
+		return
 	}
 
 	if err := d.ds.Create(&device, r.Context()); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -41,11 +43,13 @@ func (d *Devices) Delete(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, models.ErrInvalidID)
+		return
 	}
 
 	if err := d.ds.Delete(uint(id), r.Context()); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 
@@ -54,18 +58,21 @@ func (d *Devices) Get(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
+		return
 	}
 
 	device, err := d.ds.ByID(uint(id), r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
+		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&device)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
+		return
 	}
 }
 
@@ -77,15 +84,21 @@ func (d *Devices) GetMany(w http.ResponseWriter, r *http.Request) {
 	if ok {
 		count, err = strconv.ParseInt(cq[0], 10, 64)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			ProcessError(w, models.ErrInvalidID)
+			return
 		}
 	}
 	devices, err := d.ds.Many(int(count), r.Context())
+	if err != nil {
+		ProcessError(w, err)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&devices)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
+		return
 	}
 }
 
@@ -98,16 +111,19 @@ func (d *Devices) GetByName(w http.ResponseWriter, r *http.Request) {
 	}
 	if ok != true {
 		http.Error(w, "Name required for search", http.StatusBadRequest)
+		return
 	}
 
 	devices, err := d.ds.SearchByName(name, r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
+		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&devices)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ProcessError(w, err)
+		return
 	}
 }

@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+message Alarm {
+  string Type = 1;
+  string Status = 2;
+  string Severity = 3;
+  int64 DeviceID = 4;
+}
+
+message Device {
+  string Name = 1;
+  string IMEI = 2;
+  double Longitude = 3;
+  double Latitude = 4;
+}
+
+message Measurement {
+  string Type = 1;
+  double Value = 2;
+  string Unit = 3;
+  int64 DeviceID = 4;
+}
+
+message Confirmation {
+  int64 reply = 1;
+}
+
+service MeasurementService {
+  rpc CreateMeasurement(Measurement) returns (Confirmation) {}
+  rpc CreateMeasurements(stream Measurement) returns (Confirmation) {}
+}
+
+service DeviceService {
+  rpc CreateDevice(Device) returns (Confirmation) {}
+  rpc CreateDevices(stream Device) returns (Confirmation) {}
+}
+
+service AlarmService {
+  rpc CreateAlarm(Alarm) returns (Confirmation) {}
+  rpc CreateAlarms(stream Alarm) returns (Confirmation) {}
+}
