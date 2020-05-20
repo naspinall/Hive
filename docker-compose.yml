@@ -9,9 +9,9 @@ services :
     ports :
       - "5432"
 
-  httpserver :
-    image : "hivehttp"
-    ports : 
-      - "3001"
+  # httpserver :
+  #   image : "hivehttp"
+  #   ports : 
+  #     - "3001"
 
 

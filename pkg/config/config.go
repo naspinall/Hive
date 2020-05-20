@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 )
 
@@ -61,7 +62,7 @@ func DefaultConfig() Config {
 func LoadConfig() (c Config) {
 	f, err := os.Open("./config.json")
 	if err != nil {
-		fmt.Println("No config file found, using default config")
+		log.Println("No config file found, using default config")
 		return DefaultConfig()
 	}
 
@@ -70,6 +71,6 @@ func LoadConfig() (c Config) {
 		panic(err)
 	}
 
-	fmt.Println("Loaded config")
+	log.Println("Loaded config")
 	return
 }
