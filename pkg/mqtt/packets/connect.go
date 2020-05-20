@@ -1,15 +1,5 @@
 package packets
 
-type WillProperties struct {
-	WillDelayInterval      uint32
-	PayloadFormatIndicator bool
-	MessageExpiryInterval  uint32
-	ContentType            string
-	ResponseTopic          string
-	CorrelationData        []byte
-	UserProperty           *StringPair
-}
-
 type ConnectPacket struct {
 	FixedHeader *FixedHeader
 
@@ -19,31 +9,19 @@ type ConnectPacket struct {
 	KeepAlive       uint16
 
 	// Connect Flags
-	UsernameFlag   bool
-	PasswordFlag   bool
-	WillRetainFlag bool
-	WillQoSFlag    uint8
-	WillFlag       bool
-	CleanStartFlag bool
-
-	//Variable Header Properties
-	SessionExpiryInterval      uint32
-	AuthMethod                 string
-	AuthData                   []byte
-	RequestResponseInformation bool
-	RequestProblemInformation  bool
-	RecieveMaximum             uint16
-	TopicAliasMaximum          uint16
-	UserProperty               *StringPair
-	MaximumPacketSize          uint32
+	UsernameFlag     bool
+	PasswordFlag     bool
+	WillRetainFlag   bool
+	WillQoSFlag      uint8
+	WillFlag         bool
+	CleanSessionFlag bool
 
 	//Payload properties
-	ClientID       string
-	Username       string
-	WillProperties *WillProperties
-	Password       []byte
-	WillTopic      string
-	WillPayload    []byte
+	ClientID    string
+	Username    string
+	Password    []byte
+	WillTopic   string
+	WillPayload []byte
 }
 
 type ConnackPacket struct {
@@ -110,7 +88,7 @@ func (cp ConnectPacket) DecodeConnectFlags(b []byte, n int) (int, error) {
 	cp.WillRetainFlag = (fb&0x20)>>4 > 0
 	cp.WillQoSFlag = (fb & 0x18) >> 3
 	cp.WillFlag = fb>>6 > 0
-	cp.CleanStartFlag = fb>>7 > 0
+	cp.CleanSessionFlag = fb>>7 > 0
 	return n + 1, nil
 }
 
@@ -131,7 +109,7 @@ func (cp ConnectPacket) EncodeConnectFlags(b []byte) ([]byte, error) {
 	if cp.WillFlag {
 		flags = flags | (uint8(1) << 2)
 	}
-	if cp.CleanStartFlag {
+	if cp.CleanSessionFlag {
 		flags = flags | (uint8(1) << 1)
 	}
 
@@ -341,4 +319,14 @@ func NotAuth() ConnackPacket {
 	return ConnackPacket{FixedHeader: fh,
 		SessionPresent: 0,
 		ReturnCode:     NotAuthorised}
+}
+
+func Connect() (cp ConnectPacket) {
+	cp.FixedHeader = &FixedHeader{
+		Type: 1,
+	}
+	cp.ProtocolName = "MQTT"
+	cp.ProtocolVersion = 0x4
+	cp.KeepAlive = 10
+	return
 }
