@@ -1,7 +1,5 @@
 package packets
 
-import "fmt"
-
 type PublishPacket struct {
 	FixedHeader      *FixedHeader
 	TopicName        string
@@ -33,13 +31,13 @@ func NewPublishPacket(fh *FixedHeader, b []byte) (*PublishPacket, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	n, err = pp.DecodePacketIdentifier(b, n)
 	if err != nil {
 		return nil, err
 	}
-	pqyLength := int(pp.FixedHeader.RemaningLength) - n - 1
-	fmt.Println(pqyLength)
-	pp.Payload = (b[n:pqyLength])
+
+	pp.Payload = (b[n:])
 	return pp, nil
 }
 
@@ -55,6 +53,7 @@ func (pp *PublishPacket) EncodeTopicName(b []byte) ([]byte, error) {
 func (pp *PublishPacket) DecodePacketIdentifier(b []byte, n int) (m int, err error) {
 	if pp.FixedHeader.Flags.QoS > 0 {
 		pp.PacketIdentifier, m, err = DecodeTwoByteInt(b[n:])
+		m = m + n
 	}
 	return
 }

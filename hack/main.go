@@ -18,7 +18,17 @@ func main() {
 		panic(token.Error())
 	}
 
-	if token := c.Publish("hello", 2, false, "hello"); token.Wait() && token.Error() != nil {
+	if token := c.Publish("hello", 1, false, "hello"); token.Wait() && token.Error() != nil {
+		fmt.Println(token.Error())
+		os.Exit(1)
+	}
+
+	if token := c.Publish("hello", 1, false, "hello again"); token.Wait() && token.Error() != nil {
+		fmt.Println(token.Error())
+		os.Exit(1)
+	}
+
+	if token := c.Publish("hello", 1, false, "hello once again"); token.Wait() && token.Error() != nil {
 		fmt.Println(token.Error())
 		os.Exit(1)
 	}

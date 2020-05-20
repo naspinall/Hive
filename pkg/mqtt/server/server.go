@@ -6,28 +6,28 @@ import (
 	"net"
 	"time"
 
-	"github.com/jinzhu/gorm"
-
 	"github.com/google/uuid"
-	"github.com/naspinall/Hive/mqtt/packets"
+	"github.com/naspinall/Hive/pkg/mqtt/packets"
 )
 
-func NewMQTTBroker(db *gorm.DB) MQTT {
-	ss := NewSessionService(db)
+func NewMQTTBroker() MQTT {
 	return MQTT{
-		ss:                   ss,
 		SubscriptionHandlers: make(map[string]SubscribeHandler),
 		PublishHandlers:      make(map[string]PublishHandler),
+		// Default Auth handler
+		AuthHandler: func(b []byte) (bool, error) {
+			return true, nil
+		},
 	}
 }
 
-type PublishHandler func(*packets.PublishPacket, *Connection)
+type PublishHandler func(*packets.PublishPacket)
 type SubscribeHandler func(*packets.SubscribePacket, *Connection)
 
 type MQTT struct {
-	ss                   SessionService
 	SubscriptionHandlers map[string]SubscribeHandler
 	PublishHandlers      map[string]PublishHandler
+	AuthHandler          func(b []byte) (bool, error)
 }
 
 func (mqtt *MQTT) Listen(host string, port string) {
@@ -63,7 +63,7 @@ func (mqtt *MQTT) HandleNewConn(conn net.Conn) {
 	log.Printf("Read %d byte from new connection", n)
 
 	// Decoding packets
-	fh, b, err := packets.NewFixedHeader(b)
+	fh, err := packets.NewFixedHeader(b)
 	if err != nil {
 		log.Println(err)
 		conn.Close()
@@ -112,27 +112,15 @@ func (mqtt *MQTT) NewConnection(conn net.Conn, deviceID uint) (*Connection, erro
 		Conn: conn,
 	}
 
-	if err := mqtt.ss.Create(c.Session); err != nil {
-		log.Println(err)
-		return nil, err
-	}
-
 	return c, nil
 }
 
 func (mqtt *MQTT) HandleConnection(c *Connection) {
 	for {
-		b := make([]byte, 4096)
-		n, err := c.Conn.Read(b)
+		fh, b, err := c.ProcessFixedHeader()
 		if err != nil {
-			//log.Println(err)
-		}
-		if n == 0 {
-			continue
-		}
-		fh, b, err := packets.NewFixedHeader(b)
-		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
+			return
 		}
 		switch fh.Type {
 		case packets.PUBLISH:
@@ -169,7 +157,7 @@ func (mqtt *MQTT) HandleConnection(c *Connection) {
 			}
 			// Support for wildcards and multilevel coming soon
 			if handler, ok := mqtt.PublishHandlers[pp.TopicName]; ok == true {
-				handler(pp, c)
+				handler(pp)
 			}
 
 		case packets.SUBSCRIBE:
@@ -195,7 +183,6 @@ func (mqtt *MQTT) HandleConnection(c *Connection) {
 			log.Println("PONG -->")
 		case packets.DISCONNECT:
 			// Removing the session from the database, disconnecting.
-			mqtt.ss.Delete(c.Session.ID)
 			c.Conn.Close()
 			break
 		default:
@@ -212,7 +199,7 @@ func (c *Connection) PublishQos(rc chan uint16) {
 			log.Println("Connection read error")
 			return
 		}
-		fh, b, err := packets.NewFixedHeader(b)
+		fh, err := packets.NewFixedHeader(b)
 		if fh.Type == 6 {
 			pr, err := packets.NewPublishQoSPacket(fh, b)
 			if err != nil {
@@ -221,6 +208,20 @@ func (c *Connection) PublishQos(rc chan uint16) {
 			rc <- pr.PacketIdentifier.PacketIdentifier
 		}
 	}
+}
+
+func (c *Connection) ProcessFixedHeader() (fh *packets.FixedHeader, b []byte, err error) {
+	b = make([]byte, 2)
+	_, err = c.Conn.Read(b)
+	fh, err = packets.NewFixedHeader(b)
+	if err != nil {
+		log.Println(err)
+	}
+
+	// Reading only the length of the packet
+	b = make([]byte, fh.RemaningLength)
+	_, err = c.Conn.Read(b)
+	return
 }
 
 // TODO

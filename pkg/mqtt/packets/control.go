@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"log"
 )
 
@@ -61,18 +60,18 @@ type StringPair struct {
 	value string
 }
 
-func NewFixedHeader(b []byte) (*FixedHeader, []byte, error) {
+func NewFixedHeader(b []byte) (*FixedHeader, error) {
 	fh := &FixedHeader{}
 	if err := fh.DecodeTypeAndFlags(b[0]); err != nil {
 		log.Fatal("Invalid control packet")
 	}
-	rl, n, err := DecodeVariableByteInteger(b[1:])
+	rl, _, err := DecodeVariableByteInteger(b[1:])
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	fh.RemaningLength = rl
-	return fh, b[n+1:], nil
+	return fh, nil
 }
 
 func (fh *FixedHeader) EncodeFixedHeader() ([]byte, error) {
@@ -83,7 +82,6 @@ func (fh *FixedHeader) EncodeFixedHeader() ([]byte, error) {
 }
 
 func (fh *FixedHeader) DecodeTypeAndFlags(b byte) error {
-	fmt.Println(b)
 	fh.Type = b >> 4
 	fh.Flags = FixedHeaderFlags{}
 	fh.Flags.Duplicate = (b >> 3 & 0x01) > 0
