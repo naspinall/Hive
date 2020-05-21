@@ -10,11 +10,10 @@ import {
   Input,
   Box,
   Button,
-  Subtitle
+  Subtitle,
 } from "bloomer";
 import { DeviceLike } from "../module";
 import axios from "axios";
-import cogoToast from "cogo-toast";
 
 interface Props {
   isActive: boolean;
@@ -23,17 +22,17 @@ interface Props {
 
 const CreateDevice: React.FunctionComponent<Props> = ({
   isActive,
-  setActive
+  setActive,
 }: Props) => {
   const [name, setName] = useState("");
 
   const PostDevice = async (device: DeviceLike) => {
     try {
-      await axios.post("/api/device", device);
+      await axios.post("/api/devices", device, {
+        headers: { Authorization: `Bearer ${localStorage.token}` },
+      });
       setActive(false);
-    } catch (error) {
-      cogoToast.error(error.message);
-    }
+    } catch (error) {}
   };
 
   return (

@@ -28,7 +28,7 @@ const LoginDialog = () => {
         email: username,
         password: password,
       });
-      Login(data.username, data.displayName);
+      Login(data.username, data.displayName, data.token);
     } catch (error) {
       Set(error.message, "danger");
     }

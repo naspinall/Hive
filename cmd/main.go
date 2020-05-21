@@ -33,7 +33,6 @@ func main() {
 		log.Fatal(err)
 	}
 	defer services.Close()
-	services.DestructiveReset()
 	services.AutoMigrate()
 
 	usersC := controllers.NewUsers(services.User, services.RBAC)

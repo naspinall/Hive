@@ -9,6 +9,7 @@ import LoginDialog from "./components/LoginDialog";
 import { NotificationContext, useNotification } from "./hooks/notification";
 import TopNotification from "./components/TopNotification";
 import SignupDialog from "./components/SignupDialog";
+import Users from "./containers/Users";
 
 const Routes = [
   { displayName: "Home", path: "/" },
@@ -19,6 +20,7 @@ const Routes = [
       { displayName: "Devices", path: "/devices" },
       { displayName: "Measurements", path: "/measurements" },
       { displayName: "Alarms", path: "/alarms" },
+      { displayName: "Users", path : "/users"},
     ],
   },
 ];
@@ -45,6 +47,9 @@ const App = () => {
               </Route>
               <Route path="/alarms">
                 <Alarms />
+              </Route>
+              <Route path="/users">
+                <Users />
               </Route>
               <Route path="/signup">
                 <SignupDialog />

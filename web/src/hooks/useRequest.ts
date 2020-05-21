@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import axios from "axios";
+import { useState, useEffect, useContext } from "react";
+import { useAuth, AuthContext } from "./auth";
+import axios, { AxiosRequestConfig } from "axios";
 
 interface Response<T> {
   response: T;
@@ -7,7 +8,10 @@ interface Response<T> {
   isLoading: boolean;
 }
 
-const useRequest = <T>(path: string, params?: any): Response<T> => {
+const useRequest = <T>(
+  path: string,
+  params?: AxiosRequestConfig
+): Response<T> => {
   const [response, setResponse] = useState({} as T);
   const [error, setError] = useState({} as Error);
   const [isLoading, setIsLoading] = useState(false);
@@ -16,7 +20,12 @@ const useRequest = <T>(path: string, params?: any): Response<T> => {
     setIsLoading(true);
     const doRequest = async () => {
       try {
-        const res = await axios.get(path, { params });
+        const res = await axios.get(path, {
+          params,
+          headers: {
+            Authorization: `Bearer ${localStorage.token}`,
+          },
+        });
         setResponse(res.data);
         setIsLoading(false);
       } catch (error) {

@@ -7,6 +7,7 @@ interface AuthState {
   displayName: string;
   isAuthenticated: boolean;
   message: string;
+  token?: string;
 }
 
 interface AuthAction {
@@ -14,6 +15,7 @@ interface AuthAction {
   username?: string;
   displayName?: string;
   message?: string;
+  token?: string;
 }
 
 const initialAuth = {
@@ -29,6 +31,7 @@ const reducer: Reducer<AuthState, AuthAction> = (
 ) => {
   switch (action.type) {
     case "LOGIN":
+      localStorage.token = action.token;
       return {
         username: action.username ?? "", // Think for a better solution to this
         displayName: action.displayName ?? "",
@@ -36,6 +39,7 @@ const reducer: Reducer<AuthState, AuthAction> = (
         isAuthenticated: true,
       };
     case "LOGOUT":
+      localStorage.token = "";
       return {
         username: "",
         displayName: "",
@@ -43,6 +47,7 @@ const reducer: Reducer<AuthState, AuthAction> = (
         isAuthenticated: false,
       };
     case "TOKEN_EXPIRED":
+      localStorage.token = "";
       return {
         username: "",
         displayName: "",
@@ -58,12 +63,14 @@ export const useAuth = () => {
   const [state, dispatch] = useReducer(reducer, initialAuth);
   const Login = (dispatch: Dispatch<AuthAction>) => (
     username: string,
-    displayName: string
+    displayName: string,
+    token: string
   ) => {
     dispatch({
       type: "LOGIN",
       username,
       displayName,
+      token,
     });
   };
   const Logout = (dispatch: Dispatch<AuthAction>) => (
@@ -71,7 +78,7 @@ export const useAuth = () => {
     displayName: string
   ) => {
     dispatch({
-      type: "LOGIN",
+      type: "LOGOUT",
       username,
       displayName,
     });
@@ -81,7 +88,7 @@ export const useAuth = () => {
     displayName: string
   ) => {
     dispatch({
-      type: "LOGIN",
+      type: "TOKEN_EXPIRED",
       username,
       displayName,
     });
@@ -98,7 +105,7 @@ export const useAuth = () => {
 
 export const AuthContext = createContext({
   AuthState: initialAuth,
-  Login: (username: string, displayName: string) => {},
+  Login: (username: string, displayName: string, token : string) => {},
   Logout: (username: string, displayName: string) => {},
   ExpireToken: (username: string, displayName: string) => {},
 });
