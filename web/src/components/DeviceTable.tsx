@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Table, Button } from "bloomer";
 import { Device } from "../module";
 import moment from "moment";
@@ -8,6 +8,7 @@ interface Props {
   devices: Device[];
 }
 const DeviceTable: React.FunctionComponent<Props> = ({ devices }: Props) => {
+  const currentRow = useRef(0)
   const match = useRouteMatch();
   return (
     <Table isBordered isStriped>

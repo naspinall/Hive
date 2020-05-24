@@ -3,11 +3,12 @@ import { useArrayRequest } from "../hooks/useRequest";
 import { Title, Container, Level, LevelLeft, LevelItem, Icon } from "bloomer";
 import { Alarm } from "../module";
 import { AlarmTable } from "../components/AlarmTable";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 interface Props {}
 
 export default function Alarms(): ReactElement {
-  const { response, isLoading } = useArrayRequest("/api/alarms");
+  const { response, isLoading, error } = useArrayRequest("/api/alarms");
   return (
     <Container isFluid style={{ marginTop: 10 }}>
       <Level>
@@ -17,11 +18,9 @@ export default function Alarms(): ReactElement {
           </LevelItem>
         </LevelLeft>
       </Level>
-      {isLoading ? (
-        <Icon isSize="large" className="fa fa-spinner fa-3x" />
-      ) : (
+      <ErrorBoundary isLoading={isLoading} error={error}>
         <AlarmTable alarms={response as Alarm[]} />
-      )}
+      </ErrorBoundary>
     </Container>
   );
 }

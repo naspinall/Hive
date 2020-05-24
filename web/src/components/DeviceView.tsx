@@ -17,13 +17,14 @@ import { useArrayRequest } from "../hooks/useRequest";
 import { CreateDevice } from "./CreateDevice";
 import { DeviceTable } from "./DeviceTable";
 import { Device } from "../module";
+import ErrorBoundary from "./ErrorBoundary";
 
 interface Props {}
 
 const DeviceView: React.FunctionComponent<Props> = () => {
   const [params, setParams] = useState({});
   const [search, setSearch] = useState("");
-  const { response, isLoading } = useArrayRequest<Device>(
+  const { response, isLoading, error } = useArrayRequest<Device>(
     "/api/devices/",
     params
   );
@@ -33,7 +34,7 @@ const DeviceView: React.FunctionComponent<Props> = () => {
   };
 
   return (
-    <Container isFluid style={{ marginTop: 10 }}>
+    <Container style={{ marginTop: 10 }}>
       <Level>
         <LevelLeft>
           <LevelItem>
@@ -71,11 +72,9 @@ const DeviceView: React.FunctionComponent<Props> = () => {
           </LevelItem>
         </LevelLeft>
       </Level>
-      {isLoading ? (
-        <Icon isSize="large" className="fa fa-spinner fa-3x" />
-      ) : (
+      <ErrorBoundary isLoading={isLoading} error={error}>
         <DeviceTable devices={response} />
-      )}
+        </ErrorBoundary>
     </Container>
   );
 };
