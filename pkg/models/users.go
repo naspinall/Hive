@@ -48,7 +48,8 @@ type User struct {
 type UserClaims struct {
 	UserID uint `json:"userId"`
 	jwt.StandardClaims
-	Role Role `json:"role"`
+	Role   Role `json:"role"`
+	Filter *Filter
 }
 
 type userGorm struct {

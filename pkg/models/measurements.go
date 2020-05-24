@@ -12,9 +12,9 @@ import (
 
 type Measurement struct {
 	gorm.Model
-	Type     string  `gorm:"not null"`
-	Value    float64 `gorm:"not null"`
-	Unit     string  `gorm:"not null"`
+	Type     string  `gorm:"not null json:"type""`
+	Value    float64 `gorm:"not null json:"value""`
+	Unit     string  `gorm:"not null json:"unit""`
 	DeviceID uint
 	Device   Device `json:"-"`
 }
@@ -65,7 +65,14 @@ func (mg *measurementGorm) ByDevice(id uint, ctx context.Context) ([]Measurement
 
 	device := Device{Model: gorm.Model{ID: id}}
 	measurements := []Measurement{}
-	if err := mg.db.Model(&device).Related(&measurements).Error; err != nil {
+	uc, err := ExtractUserClaims(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tx := mg.db.Model(&device).Related(&measurements)
+
+	// Applying all filters
+	if err := uc.Filter.ApplyAll(tx); err != nil {
 		return nil, err
 	}
 	return measurements, nil

@@ -33,7 +33,6 @@ func main() {
 		log.Fatal(err)
 	}
 	defer services.Close()
-	services.DestructiveReset()
 	services.AutoMigrate()
 
 	usersC := controllers.NewUsers(services.User, services.RBAC)
@@ -45,15 +44,15 @@ func main() {
 	auth := userM.JWTAuth()
 
 	r := mux.NewRouter()
-	api := r.PathPrefix("/api").Subrouter().StrictSlash(true)
+	api := r.PathPrefix("/api").Subrouter()
 
 	api.HandleFunc("/login", usersC.Login).Methods("POST")
 
 	//Device CRUD, requires JWT Auth(cfg.JWTKey)
 	d := api.PathPrefix("/devices").Subrouter()
 	d.Use(auth)
-	d.HandleFunc("/", devicesC.GetMany).Methods("GET")
 	d.HandleFunc("/", devicesC.Create).Methods("POST")
+	d.HandleFunc("/", devicesC.GetMany).Methods("GET")
 	d.HandleFunc("/{id}/", devicesC.Delete).Methods("DELETE")
 	d.HandleFunc("/{id}", devicesC.Get).Methods("GET")
 	d.HandleFunc("/{id}/measurements", measurementsC.Create).Methods("POST")

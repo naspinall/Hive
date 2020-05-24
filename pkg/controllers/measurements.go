@@ -86,7 +86,7 @@ func (m *Measurements) GetByDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	measurements, err := m.ms.ByDevice(uint(id), r.Context())
+	measurements, err := m.ms.ByDevice(uint(id), ctx)
 	if err != nil {
 		ProcessError(w, err)
 		return

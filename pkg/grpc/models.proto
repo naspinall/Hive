@@ -8,10 +8,11 @@ message Alarm {
 }
 
 message Device {
-  string Name = 1;
-  string IMEI = 2;
-  double Longitude = 3;
-  double Latitude = 4;
+  int64 ID = 1;
+  string Name = 2;
+  string IMEI = 3;
+  double Longitude = 4;
+  double Latitude = 5;
 }
 
 message Measurement {
@@ -21,13 +22,19 @@ message Measurement {
   int64 DeviceID = 4;
 }
 
-message Confirmation {
-  int64 reply = 1;
+message DeviceFilter {
+  string DateFrom = 1;
+  string DateTo = 2;
+  string Type = 3;
+  int64 DeviceID = 4;
 }
+
+message Confirmation { int64 reply = 1; }
 
 service MeasurementService {
   rpc CreateMeasurement(Measurement) returns (Confirmation) {}
   rpc CreateMeasurements(stream Measurement) returns (Confirmation) {}
+  rpc GetMeasurements(DeviceFilter) returns (stream Measurement) {}
 }
 
 service DeviceService {
@@ -38,4 +45,5 @@ service DeviceService {
 service AlarmService {
   rpc CreateAlarm(Alarm) returns (Confirmation) {}
   rpc CreateAlarms(stream Alarm) returns (Confirmation) {}
+  rpc GetAlarms(DeviceFilter) returns (stream Alarm) {}
 }
