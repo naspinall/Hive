@@ -60,7 +60,7 @@ type Webhook func(deviceID uint, action, Type string, data interface{}) error
 
 func (sg *subscriptionGorm) ByDevice(id uint, ctx context.Context) ([]Subscription, error) {
 
-	device := Device{Model: gorm.Model{ID: id}}
+	device := Device{ID: id}
 	subscriptions := []Subscription{}
 	if err := sg.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Model(&device).Related(&subscriptions).Error; err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func (sg *subscriptionGorm) Delete(id uint, ctx context.Context) error {
 
 func (sg *subscriptionGorm) Webhook(deviceID uint, action, Type string, data interface{}) error {
 	var subscriptions []Subscription
-	device := Device{Model: gorm.Model{ID: deviceID}}
+	device := Device{ID: deviceID}
 	if err := sg.db.Where("action = ?", action).Where("type = ?", Type).Model(&device).Related(&subscriptions).Error; err != nil {
 		return err
 	}

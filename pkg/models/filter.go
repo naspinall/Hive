@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"net/url"
 	"strconv"
 	"time"
@@ -9,6 +10,10 @@ import (
 )
 
 type FilterContextKey string
+
+const (
+	ErrBadFilter = ErrorBadRequest("Bad Filter Provided")
+)
 
 type Filter struct {
 	DateFrom time.Time
@@ -101,13 +106,13 @@ func (f Filter) ApplyDateFrom(db *gorm.DB) *gorm.DB {
 }
 func (f Filter) ApplyDateTo(db *gorm.DB) *gorm.DB {
 	if !f.DateTo.IsZero() {
-		return db.Where("type > ?", f.Type)
+		return db.Where("create_at < ?", f.Type)
 	}
 	return db
 }
 func (f Filter) ApplyType(db *gorm.DB) *gorm.DB {
 	if f.Type != "" {
-		return db.Where("type > ?", f.Type)
+		return db.Where("type = ?", f.Type)
 	}
 	return db
 }
@@ -125,11 +130,19 @@ func (f Filter) ApplyLimit(db *gorm.DB) *gorm.DB {
 	return db.Limit(100)
 }
 
-func (f Filter) ApplyAll(db *gorm.DB) error {
-	db = f.ApplyDateFrom(db)
-	db = f.ApplyDateTo(db)
-	db = f.ApplyType(db)
-	db = f.ApplyOffset(db)
-	db = f.ApplyLimit(db)
-	return db.Error
+func (f Filter) ApplyAll(db *gorm.DB) *gorm.DB {
+	return db.Scopes(f.ApplyDateFrom,
+		f.ApplyDateTo,
+		f.ApplyType,
+		f.ApplyOffset,
+		f.ApplyLimit)
+
+}
+
+func ExtractFilterClaims(ctx context.Context) (*Filter, error) {
+	filter, ok := ctx.Value(FilterContextKey("Filter")).(*Filter)
+	if ok {
+		return filter, nil
+	}
+	return nil, ErrBadFilter
 }

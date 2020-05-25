@@ -42,6 +42,7 @@ func main() {
 	subscriptionsC := controllers.NewSubscriptions(services.Subscription)
 	userM := middleware.NewUsersMiddleware(services.User)
 	auth := userM.JWTAuth()
+	withFilter := middleware.WithFilter()
 
 	r := mux.NewRouter()
 	api := r.PathPrefix("/api").Subrouter()
@@ -50,7 +51,7 @@ func main() {
 
 	//Device CRUD, requires JWT Auth(cfg.JWTKey)
 	d := api.PathPrefix("/devices").Subrouter()
-	d.Use(auth)
+	d.Use(auth, withFilter)
 	d.HandleFunc("/", devicesC.Create).Methods("POST")
 	d.HandleFunc("/", devicesC.GetMany).Methods("GET")
 	d.HandleFunc("/{id}/", devicesC.Delete).Methods("DELETE")
@@ -74,7 +75,7 @@ func main() {
 
 	//Measurement CRUD
 	m := api.PathPrefix("/measurements").Subrouter()
-	m.Use(auth)
+	m.Use(auth, withFilter)
 	m.HandleFunc("/{id}/", measurementsC.Delete).Methods("DELETE")
 	m.HandleFunc("/{id}/", measurementsC.Get).Methods("GET")
 

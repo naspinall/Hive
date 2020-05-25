@@ -57,8 +57,9 @@ func NewAlarmService(db *gorm.DB, Subscription SubscriptionService) AlarmService
 
 func (ag *alarmGorm) ByDevice(id uint, ctx context.Context) ([]Alarm, error) {
 
-	device := Device{Model: gorm.Model{ID: id}}
+	device := Device{ID: id}
 	alarms := []Alarm{}
+
 	if err := ag.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Model(&device).Related(&alarms).Error; err != nil {
 		return nil, err
 	}
@@ -68,7 +69,13 @@ func (ag *alarmGorm) ByDevice(id uint, ctx context.Context) ([]Alarm, error) {
 
 func (ag *alarmGorm) ByID(id uint, ctx context.Context) (*Alarm, error) {
 	var alarm Alarm
-	if err := ag.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Where("id = ?", id).First(&alarm).Error; err != nil {
+	filter, err := ExtractFilterClaims(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Applying all filters
+	if err := filter.ApplyAll(ag.db).Where("id = ?", id).First(&alarm).Error; err != nil {
 		return nil, err
 	}
 
@@ -78,7 +85,7 @@ func (ag *alarmGorm) ByID(id uint, ctx context.Context) (*Alarm, error) {
 func (ag *alarmGorm) Many(count int, ctx context.Context) ([]*Alarm, error) {
 
 	var alarms []*Alarm
-	if err := ag.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).Limit(count).Find(&alarms).Error; err != nil {
+	if err := ag.db.Limit(count).Find(&alarms).Error; err != nil {
 		return nil, err
 	}
 	return alarms, nil

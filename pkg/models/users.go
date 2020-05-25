@@ -48,8 +48,7 @@ type User struct {
 type UserClaims struct {
 	UserID uint `json:"userId"`
 	jwt.StandardClaims
-	Role   Role `json:"role"`
-	Filter *Filter
+	Role Role `json:"role"`
 }
 
 type userGorm struct {
@@ -377,7 +376,7 @@ func (ug *userGorm) signToken(user *User) error {
 		UserID: user.ID,
 		Role:   role,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Hour * 2).Unix(),
+			ExpiresAt: time.Now().Add(time.Hour * 10000).Unix(),
 			Issuer:    "Hive",
 		},
 	}

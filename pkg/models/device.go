@@ -3,17 +3,21 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/streadway/amqp"
 )
 
 type Device struct {
-	gorm.Model
-	Name      string  `gorm:"not null;unique_index" json:"name"`
-	IMEI      string  `json:"imei"`
-	Longitude float64 `json:"longitude"`
-	Latitude  float64 `json:"latitude"`
+	ID        uint       `gorm:"primary_key" json:"id"`
+	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt time.Time  `json:"updatedAt"`
+	DeletedAt *time.Time `json:"deletedAt"`
+	Name      string     `gorm:"not null;unique_index" json:"name"`
+	IMEI      string     `json:"imei"`
+	Longitude float64    `json:"longitude"`
+	Latitude  float64    `json:"latitude"`
 }
 
 type deviceGorm struct {
@@ -150,7 +154,7 @@ func (dg *deviceGorm) Update(device *Device, ctx context.Context) (err error) {
 }
 
 func (dg *deviceGorm) Delete(id uint, ctx context.Context) (err error) {
-	device := Device{Model: gorm.Model{ID: id}}
+	device := Device{ID: id}
 	err = dg.db.Delete(&device).Error
 	return
 }

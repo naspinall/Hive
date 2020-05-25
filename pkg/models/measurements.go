@@ -63,16 +63,15 @@ type measurementWebhook struct {
 
 func (mg *measurementGorm) ByDevice(id uint, ctx context.Context) ([]Measurement, error) {
 
-	device := Device{Model: gorm.Model{ID: id}}
+	device := Device{ID: id}
 	measurements := []Measurement{}
-	uc, err := ExtractUserClaims(ctx)
+	filter, err := ExtractFilterClaims(ctx)
 	if err != nil {
 		return nil, err
 	}
-	tx := mg.db.Model(&device).Related(&measurements)
 
 	// Applying all filters
-	if err := uc.Filter.ApplyAll(tx); err != nil {
+	if err := filter.ApplyAll(mg.db).Model(&device).Related(&measurements).Error; err != nil {
 		return nil, err
 	}
 	return measurements, nil
@@ -106,7 +105,7 @@ func (mg *measurementGorm) Delete(id uint, ctx context.Context) error {
 
 func (mg *measurementGorm) Callback(m *Measurement, ctx context.Context) {
 	var subscriptions []*Subscription
-	device := Device{Model: gorm.Model{ID: uint(m.DeviceID)}}
+	device := Device{ID: uint(m.DeviceID)}
 
 	err := mg.db.Model(&device).Related(&subscriptions).Error
 	if err != nil {
