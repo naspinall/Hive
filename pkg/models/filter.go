@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	grpc "google.golang.org/grpc/metadata"
+
 	"github.com/jinzhu/gorm"
 )
 
@@ -23,6 +25,13 @@ type Filter struct {
 	Limit    uint
 }
 
+func getFirst(list []string) (string, error) {
+	if len(list) != 1 {
+		return "", ErrBadFilter
+	}
+	return list[0], nil
+}
+
 func NewFilterFromQueryString(queries url.Values) (*Filter, error) {
 	f := &Filter{}
 	if err := f.WithDateFrom(queries.Get("dateFrom")); err != nil {
@@ -38,6 +47,45 @@ func NewFilterFromQueryString(queries url.Values) (*Filter, error) {
 	if err := f.WithLimit(queries.Get("limit")); err != nil {
 		return nil, err
 	}
+	return f, nil
+}
+
+func NewFilterFromGRPCMetatdata(md grpc.MD) (*Filter, error) {
+	f := &Filter{}
+	dateFrom, err := getFirst(md.Get("dateFrom"))
+	if err != nil {
+		return nil, err
+	}
+	if err := f.WithDateFrom(dateFrom); err != nil {
+		return nil, err
+	}
+	dateTo, err := getFirst(md.Get("dateTo"))
+	if err != nil {
+		return nil, err
+	}
+	if err := f.WithDateTo(dateTo); err != nil {
+		return nil, err
+	}
+	Type, err := getFirst(md.Get("type"))
+	if err != nil {
+		return nil, err
+	}
+	f.WithType(Type)
+	offset, err := getFirst(md.Get("offset"))
+	if err != nil {
+		return nil, err
+	}
+	if err := f.WithOffset(offset); err != nil {
+		return nil, err
+	}
+	limit, err := getFirst(md.Get("limit"))
+	if err != nil {
+		return nil, err
+	}
+	if err := f.WithLimit(limit); err != nil {
+		return nil, err
+	}
+
 	return f, nil
 }
 
@@ -100,7 +148,7 @@ func (f *Filter) WithLimit(limit string) error {
 
 func (f Filter) ApplyDateFrom(db *gorm.DB) *gorm.DB {
 	if !f.DateFrom.IsZero() {
-		return db.Where("create_at < ?", f.DateFrom)
+		return db.Where("create_at > ?", f.DateFrom)
 	}
 	return db
 }
@@ -136,7 +184,6 @@ func (f Filter) ApplyAll(db *gorm.DB) *gorm.DB {
 		f.ApplyType,
 		f.ApplyOffset,
 		f.ApplyLimit)
-
 }
 
 func ExtractFilterClaims(ctx context.Context) (*Filter, error) {

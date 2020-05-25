@@ -75,6 +75,7 @@ func (s *modelsServer) CreateMeasuremnts(stream MeasurementService_CreateMeasure
 		return err
 	}
 
+	// TODO this should be in a transaction, insert lets say 100 at a time.
 	// Creating a measurements for each value streamed
 	for {
 		measurement, err := stream.Recv()
@@ -122,28 +123,36 @@ func (s *modelsServer) GetMeasurements(stream MeasurementService_GetMeasurements
 		return err
 	}
 
-	// Creating a measurements for each value streamed
-	for {
-		// measurement, err := stream.Recv()
-		// if err != io.EOF {
-		// 	return nil
-		// }
-		// if err != nil {
-		// 	return err
-		// }
-
-		// m := &models.Measurement{
-		// 	Value:    measurement.GetValue(),
-		// 	DeviceID: uint(measurement.GetDeviceID()),
-		// 	Type:     measurement.GetType(),
-		// 	Unit:     measurement.GetUnit(),
-		// }
-
-		// err = s.ms.Create(m, ctx)
-		// if err != nil {
-		// 	return err
-		// }
-
-		// return nil
+	f, err := models.NewFilterFromGRPCMetatdata(headers)
+	total, err := s.ms.Count(ctx)
+	ctx = context.WithValue(ctx, models.FilterContextKey("Filter"), f)
+	if err != nil {
+		return err
 	}
+	count := uint(0)
+	// Getting measurements in a stream.
+	for count < total {
+		f.Offset = count
+		f.Limit = 100
+		measurements, err := s.ms.GetMany(ctx)
+		if err != nil {
+			return err
+		}
+		go func() {
+			for _, measurement := range measurements {
+				m := &Measurement{
+					Type:     measurement.Type,
+					Value:    measurement.Value,
+					Unit:     measurement.Type,
+					DeviceID: int64(measurement.DeviceID),
+				}
+				// TODO work out how to handle errors
+				stream.Send(m)
+			}
+		}()
+
+		count += 100
+	}
+
+	return nil
 }

@@ -41,6 +41,9 @@ type MeasurementDB interface {
 	Create(measurement *Measurement, ctx context.Context) error
 	Update(measurement *Measurement, ctx context.Context) error
 	Delete(id uint, ctx context.Context) error
+	Count(ctx context.Context) (uint, error)
+	CountByDeviceID(deviceID uint, ctx context.Context) (uint, error)
+	GetMany(ctx context.Context) ([]Measurement, error)
 }
 
 func NewMeasurementService(db *gorm.DB, Subscription SubscriptionService) MeasurementService {
@@ -77,6 +80,20 @@ func (mg *measurementGorm) ByDevice(id uint, ctx context.Context) ([]Measurement
 	return measurements, nil
 }
 
+func (mg *measurementGorm) GetMany(ctx context.Context) ([]Measurement, error) {
+	measurements := []Measurement{}
+	filter, err := ExtractFilterClaims(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Applying all filters
+	if err := filter.ApplyAll(mg.db).Find(&measurements).Error; err != nil {
+		return nil, err
+	}
+	return measurements, nil
+}
+
 func (mg *measurementGorm) ByID(id uint, ctx context.Context) (*Measurement, error) {
 	var measurement Measurement
 	if err := mg.db.Where("id = ?", id).First(&measurement).Error; err != nil {
@@ -84,6 +101,25 @@ func (mg *measurementGorm) ByID(id uint, ctx context.Context) (*Measurement, err
 	}
 
 	return &measurement, nil
+}
+
+func (mg *measurementGorm) Count(ctx context.Context) (uint, error) {
+	var count uint
+	if err := mg.db.Model(&Measurement{}).Count(&count).Error; err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (mg *measurementGorm) CountByDeviceID(deviceID uint, ctx context.Context) (uint, error) {
+	device := Device{ID: deviceID}
+	var count uint
+	if err := mg.db.Model(&device).Related(&Measurement{}).Count(&count).Error; err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 func (mg *measurementGorm) Create(measurement *Measurement, ctx context.Context) error {
