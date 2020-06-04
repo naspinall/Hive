@@ -27,6 +27,8 @@ message DeviceFilter {
   string DateTo = 2;
   string Type = 3;
   int64 DeviceID = 4;
+  uint64 Offset = 5;
+  uint64 Limit = 6;
 }
 
 message Confirmation { int64 reply = 1; }

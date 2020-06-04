@@ -39,6 +39,7 @@ type MeasurementDB interface {
 	ByID(id uint, ctx context.Context) (*Measurement, error)
 	ByDevice(id uint, ctx context.Context) ([]Measurement, error)
 	Create(measurement *Measurement, ctx context.Context) error
+	CreateMany(measurements []*Measurement, ctx context.Context) error
 	Update(measurement *Measurement, ctx context.Context) error
 	Delete(id uint, ctx context.Context) error
 	Count(ctx context.Context) (uint, error)
@@ -64,6 +65,17 @@ type measurementWebhook struct {
 	MeasurementDB
 }
 
+func (mg *measurementGorm) ApplyFilter(ctx context.Context) *gorm.DB {
+	// Think about this.
+	filter, _ := ExtractFilterClaims(ctx)
+	return mg.db.Scopes(
+		filter.ApplyDateFrom,
+		filter.ApplyDateTo,
+		filter.ApplyType,
+		filter.ApplyOffset,
+		filter.ApplyLimit)
+}
+
 func (mg *measurementGorm) ByDevice(id uint, ctx context.Context) ([]Measurement, error) {
 
 	device := Device{ID: id}
@@ -82,14 +94,9 @@ func (mg *measurementGorm) ByDevice(id uint, ctx context.Context) ([]Measurement
 
 func (mg *measurementGorm) GetMany(ctx context.Context) ([]Measurement, error) {
 	measurements := []Measurement{}
-	filter, err := ExtractFilterClaims(ctx)
-	if err != nil {
+	if err := mg.ApplyFilter(ctx).Find(&measurements).Error; err != nil {
 		return nil, err
-	}
 
-	// Applying all filters
-	if err := filter.ApplyAll(mg.db).Find(&measurements).Error; err != nil {
-		return nil, err
 	}
 	return measurements, nil
 }
@@ -105,7 +112,7 @@ func (mg *measurementGorm) ByID(id uint, ctx context.Context) (*Measurement, err
 
 func (mg *measurementGorm) Count(ctx context.Context) (uint, error) {
 	var count uint
-	if err := mg.db.Model(&Measurement{}).Count(&count).Error; err != nil {
+	if err := mg.ApplyFilter(ctx).Model(&Measurement{}).Count(&count).Error; err != nil {
 		return 0, err
 	}
 
@@ -115,7 +122,7 @@ func (mg *measurementGorm) Count(ctx context.Context) (uint, error) {
 func (mg *measurementGorm) CountByDeviceID(deviceID uint, ctx context.Context) (uint, error) {
 	device := Device{ID: deviceID}
 	var count uint
-	if err := mg.db.Model(&device).Related(&Measurement{}).Count(&count).Error; err != nil {
+	if err := mg.ApplyFilter(ctx).Model(&device).Related(&Measurement{}).Count(&count).Error; err != nil {
 		return 0, err
 	}
 
@@ -128,6 +135,14 @@ func (mg *measurementGorm) Create(measurement *Measurement, ctx context.Context)
 		return err
 	}
 	mg.Callback(measurement, ctx)
+	return nil
+}
+
+func (mg *measurementGorm) CreateMany(measurement []*Measurement, ctx context.Context) error {
+	err := mg.db.Create(measurement).Error
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
