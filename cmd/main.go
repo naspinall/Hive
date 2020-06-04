@@ -17,9 +17,11 @@ func main() {
 
 	cfg := config.LoadConfig()
 	dbCfg := cfg.Database
+	cCfg := cfg.Cache
 
 	services, err := models.NewServices(
 		models.WithGorm(dbCfg.Dialect(), dbCfg.ConnectionInfo()),
+		models.WithCache(cCfg.Address(), cCfg.Password, cCfg.DB),
 		models.WithLogMode(true),
 		models.WithSubscriptions(),
 		models.WithUsers(cfg.Pepper, cfg.JWTKey),

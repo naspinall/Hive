@@ -1,17 +1,14 @@
-version : '3'
-services :
-  db :
-    image : "postgres:latest"
-    environment :
+version: "3"
+services:
+  db:
+    image: "postgres:latest"
+    environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: hive
       POSTGRES_DB: hive
-    ports :
+    ports:
       - "5432"
-
-  # httpserver :
-  #   image : "hivehttp"
-  #   ports : 
-  #     - "3001"
-
-
+  cache:
+    image: redis:alpine
+    ports:
+      - "6379"

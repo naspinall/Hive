@@ -15,12 +15,20 @@ type PostgresConfig struct {
 	Name     string `json:"name"`
 }
 
+type RedisConfig struct {
+	Host     string `json:"host"`
+	Port     uint   `json:"port"`
+	Password string `json:"password"`
+	DB       int    `json:"db"`
+}
+
 type Config struct {
 	Port     int            `json:"port"`
 	Env      string         `json:"env"`
 	Pepper   string         `json:"pepper"`
 	JWTKey   string         `json:"jwtKey"`
 	Database PostgresConfig `json:"database"`
+	Cache    RedisConfig    `json:"redis"`
 }
 
 func (c PostgresConfig) Dialect() string {
@@ -73,4 +81,8 @@ func LoadConfig() (c Config) {
 
 	log.Println("Loaded config")
 	return
+}
+
+func (rc RedisConfig) Address() string {
+	return fmt.Sprintf("%s:%d", rc.Host, rc.Port)
 }

@@ -3,9 +3,12 @@ module github.com/naspinall/Hive
 go 1.12
 
 require (
+	cloud.google.com/go v0.37.4
 	github.com/denisenkom/go-mssqldb v0.0.0-20191001013358-cfbb681360f0 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/eclipse/paho.mqtt.golang v1.2.0
+	github.com/go-redis/redis v6.15.8+incompatible
+	github.com/go-redis/redis/v8 v8.0.0-beta.2 // indirect
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/protobuf v1.4.1
 	github.com/google/uuid v1.1.1
@@ -15,7 +18,6 @@ require (
 	github.com/lib/pq v1.2.0 // indirect
 	github.com/neelance/parallel v0.0.0-20160708114440-4de9ce63d14c // indirect
 	github.com/opentracing/basictracer-go v1.0.0 // indirect
-	github.com/opentracing/opentracing-go v1.1.0 // indirect
 	github.com/prometheus/client_golang v1.2.1 // indirect
 	github.com/slimsag/godocmd v0.0.0-20161025000126-a1005ad29fe3 // indirect
 	github.com/sourcegraph/ctxvfs v0.0.0-20180418081416-2b65f1b1ea81 // indirect

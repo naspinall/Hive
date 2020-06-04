@@ -1,6 +1,9 @@
 package models
 
 import (
+	"log"
+
+	"github.com/go-redis/redis"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 )
@@ -14,7 +17,9 @@ type Services struct {
 	User         UserService
 	Subscription SubscriptionService
 	RBAC         RBACService
+	Cache        CacheService
 	db           *gorm.DB
+	cache        *redis.Client
 }
 
 func NewServices(cfgs ...ServicesConfig) (*Services, error) {
@@ -48,8 +53,20 @@ func WithGorm(dialect, connectionInfo string) ServicesConfig {
 		if err != nil {
 			return err
 		}
+		log.Println("Successfully connected to Database")
 
 		s.db = db
+		return nil
+	}
+}
+
+func WithCache(addr string, password string, db int) ServicesConfig {
+	return func(s *Services) error {
+		cache, err := NewRedisCache(addr, password, db)
+		if err != nil {
+			return err
+		}
+		s.Cache = cache
 		return nil
 	}
 }
@@ -81,7 +98,7 @@ func WithUsers(pepper string, jwtKey string) ServicesConfig {
 }
 func WithDevices() ServicesConfig {
 	return func(s *Services) error {
-		s.Device = NewDeviceService(s.db)
+		s.Device = NewDeviceService(s.db, s.Cache)
 		return nil
 	}
 }

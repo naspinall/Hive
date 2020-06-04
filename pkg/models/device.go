@@ -3,7 +3,10 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log"
 
+	"github.com/go-redis/redis"
 	"github.com/jinzhu/gorm"
 	"github.com/streadway/amqp"
 )
@@ -18,6 +21,11 @@ type Device struct {
 
 type deviceGorm struct {
 	db *gorm.DB
+}
+
+type deviceCache struct {
+	cache CacheService
+	DeviceDB
 }
 
 type deviceAuditLogger struct {
@@ -85,11 +93,14 @@ func newDeviceRabbitMQ(connectionInfo string) (*deviceRabbitMQ, error) {
 	}, nil
 }
 
-func NewDeviceService(db *gorm.DB) DeviceService {
+func NewDeviceService(db *gorm.DB, cache CacheService) DeviceService {
 	return &deviceService{
 		&deviceAuthorization{
 			&deviceAuditLogger{
-				&deviceGorm{db: db},
+				&deviceCache{
+					cache,
+					&deviceGorm{db: db},
+				},
 			},
 		},
 	}
@@ -350,6 +361,7 @@ func (da deviceAuthorization) Create(device *Device, ctx context.Context) error 
 	}
 	return da.DeviceDB.Create(device, ctx)
 }
+
 func (da deviceAuthorization) Update(device *Device, ctx context.Context) error {
 	uc, err := ExtractUserClaims(ctx)
 	dr := uc.Role.Devices
@@ -365,4 +377,83 @@ func (da deviceAuthorization) Delete(id uint, ctx context.Context) error {
 		return ErrDeviceDeleteRequired
 	}
 	return da.DeviceDB.Delete(id, ctx)
+}
+
+func (dc deviceCache) Create(device *Device, ctx context.Context) error {
+
+	// Creating Device in DB
+	err := dc.DeviceDB.Create(device, ctx)
+	if err != nil {
+		return err
+	}
+
+	// Load into cache as likey will be accessed again soon.
+	key := fmt.Sprintf("device-%d", device.ID)
+	dc.cache.Set(key, device)
+
+	return nil
+}
+
+func (dc deviceCache) ByID(id uint, ctx context.Context) (*Device, error) {
+
+	// Getting from the cache
+	key := fmt.Sprintf("device-%d", id)
+	fmt.Println(key)
+	data, err := dc.cache.Get(key)
+
+	if err == redis.Nil {
+		log.Printf("No dice")
+		// Getting from database and hydrating cache.
+		device, err := dc.DeviceDB.ByID(id, ctx)
+
+		// Setting value in the cache as it doesn't exist.
+		dc.cache.Set(key, device)
+		return device, err
+	} else if err != nil {
+		return dc.DeviceDB.ByID(id, ctx)
+	}
+
+	// Device typecase
+	cacheDevice, ok := data.(Device)
+
+	// Using cached value.
+	if ok {
+		return &cacheDevice, nil
+	}
+
+	// Errors with cache just return as normal.
+	return dc.DeviceDB.ByID(id, ctx)
+}
+
+func (dc deviceCache) Update(device *Device, ctx context.Context) error {
+
+	// Getting from the cache
+	key := fmt.Sprintf("device-%d", device.ID)
+	err := dc.DeviceDB.Update(device, ctx)
+	if err != nil {
+		return err
+	}
+	// Getting updated device.
+	ud, err := dc.DeviceDB.ByID(device.ID, ctx)
+	if err != nil {
+		return err
+	}
+
+	// Refreshing value in cache.
+	dc.cache.Set(key, ud)
+	return nil
+}
+
+func (dc deviceCache) Delete(id uint, ctx context.Context) error {
+	err := dc.Delete(id, ctx)
+	if err != nil {
+		return err
+	}
+	// Getting from the cache
+	key := fmt.Sprintf("device-%d", id)
+	err = dc.cache.Remove(key)
+	if err != nil {
+		return err
+	}
+	return nil
 }
