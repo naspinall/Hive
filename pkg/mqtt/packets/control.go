@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"log"
 )
 
 // Control packet types
@@ -39,19 +38,8 @@ const (
 	NotAuthorised               = 0x05 //The Client is not authorized to connect
 )
 
-type FixedHeaderFlags struct {
-	Duplicate bool
-	QoS       uint8
-	Retain    bool
-}
-
-type FixedHeader struct {
-	Type           uint8
-	Flags          FixedHeaderFlags
-	RemaningLength int
-}
-
 type PacketIdentifier struct {
+	*Packet
 	PacketIdentifier uint16
 }
 
@@ -60,71 +48,14 @@ type StringPair struct {
 	value string
 }
 
-func NewFixedHeader(b []byte) (*FixedHeader, error) {
-	fh := &FixedHeader{}
-	if err := fh.DecodeTypeAndFlags(b[0]); err != nil {
-		log.Fatal("Invalid control packet")
-	}
-	rl, _, err := DecodeVariableByteInteger(b[1:])
-
-	if err != nil {
-		return nil, err
-	}
-	fh.RemaningLength = rl
-	return fh, nil
-}
-
-func (fh *FixedHeader) EncodeFixedHeader() ([]byte, error) {
-	b, err := fh.EncodeTypeAndFlags()
-
-	b, err = EncodeVariableByteInteger(b, fh.RemaningLength)
-	return b, err
-}
-
-func (fh *FixedHeader) DecodeTypeAndFlags(b byte) error {
-	fh.Type = b >> 4
-	fh.Flags = FixedHeaderFlags{}
-	fh.Flags.Duplicate = (b >> 3 & 0x01) > 0
-	fh.Flags.QoS = uint8(b >> 1 & 0x03)
-	fh.Flags.Retain = b&0x01 > 0
+func (pi *PacketIdentifier) DecodePacketIdentifier() error {
+	pi.PacketIdentifier = pi.DecodeTwoByteInt()
 	return nil
 }
 
-func (fh *FixedHeader) EncodeTypeAndFlags() ([]byte, error) {
-	tf := byte(fh.Type) << 4
-
-	if fh.Flags.Duplicate {
-		tf |= 0x08
-	}
-	tf |= fh.Flags.QoS << 2
-	if fh.Flags.Retain {
-		tf |= 0x01
-	}
-	return []byte{tf}, nil
-}
-
-func (fh *FixedHeader) PrependFixedHeader(b []byte) ([]byte, error) {
-	fhb, err := fh.EncodeFixedHeader()
-	if err != nil {
-		return nil, err
-	}
-	fhb, err = EncodeVariableByteInteger(b, fh.RemaningLength)
-	if err != nil {
-		return nil, err
-	}
-	return append(fhb, b...), nil
-}
-
-func (pi *PacketIdentifier) DecodePacketIdentifier(b []byte, n int) (m int, err error) {
-	pi.PacketIdentifier, m, err = DecodeTwoByteInt(b[n:])
-	if err != nil {
-		return -1, err
-	}
-	return m, err
-}
-
-func (pi *PacketIdentifier) EncodePacketIdentifier(b []byte) ([]byte, error) {
-	return EncodeTwoByteInt(b, pi.PacketIdentifier)
+func (pi *PacketIdentifier) EncodePacketIdentifier() error {
+	pi.EncodeTwoByteInt(pi.PacketIdentifier)
+	return nil
 }
 
 // All functions return the value expected and the number of bytes traversed
@@ -190,23 +121,6 @@ func DecodeStringPair(b []byte) (*StringPair, int, error) {
 		name:  name,
 		value: value,
 	}, m + n, nil
-}
-
-func EncodeVariableByteInteger(b []byte, x int) ([]byte, error) {
-	var vbi []byte
-
-	for {
-		eb := byte(x % 128)
-		x /= 128
-		if x > 0 {
-			eb = eb | 128
-		}
-		vbi = append(vbi, eb)
-		if x == 0 {
-			break
-		}
-	}
-	return append(b, vbi...), nil
 }
 
 func EncodeByte(b []byte, nb byte) ([]byte, error) {

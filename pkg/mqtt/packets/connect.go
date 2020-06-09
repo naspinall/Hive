@@ -11,8 +11,7 @@ type WillProperties struct {
 }
 
 type ConnectPacket struct {
-	FixedHeader *FixedHeader
-
+	*Packet
 	//Variable Header
 	ProtocolName    string
 	ProtocolVersion byte
@@ -47,71 +46,89 @@ type ConnectPacket struct {
 }
 
 type ConnackPacket struct {
-	FixedHeader    *FixedHeader
+	*Packet
 	SessionPresent byte
 	ReturnCode     byte
 }
 
-func NewConnackPacket(fh *FixedHeader, b []byte) (*ConnackPacket, error) {
-	rc := b[0]
-	return &ConnackPacket{FixedHeader: fh, ReturnCode: rc}, nil
+func NewConnackPacket(b []byte) (*ConnackPacket, error) {
+	p, err := NewMQTTPacket(b)
+	if err != nil {
+		return nil, err
+	}
+
+	rc, err := p.DecodeByte()
+	if err != nil {
+		return nil, err
+	}
+
+	return &ConnackPacket{Packet: p, ReturnCode: rc}, nil
 
 }
 
-func NewConnectPacket(fh *FixedHeader, b []byte) (*ConnectPacket, error) {
-	cp := &ConnectPacket{FixedHeader: fh}
-	n, err := cp.DecodeProtocolVersion(b, 0)
+func NewConnectPacket(p *Packet) (*ConnectPacket, error) {
+	cp := &ConnectPacket{
+		Packet: p,
+	}
+
+	err := cp.DecodeProtocolVersion()
 	if err != nil {
 		return nil, err
 	}
-	n, err = cp.DecodeProtocolName(b, n)
+	err = cp.DecodeProtocolName()
 	if err != nil {
 		return nil, err
 	}
-	n, err = cp.DecodeConnectFlags(b, n)
+	err = cp.DecodeConnectFlags()
 	if err != nil {
 		return nil, err
 	}
-	n, err = cp.DecodeKeepAlive(b, n)
+	err = cp.DecodeKeepAlive()
 	if err != nil {
 		return nil, err
 	}
-	err = cp.DecodePayload(b, n)
+	err = cp.DecodePayload()
 	if err != nil {
 		return nil, err
 	}
 	return cp, nil
 }
 
-func (cp ConnectPacket) DecodeProtocolName(b []byte, n int) (int, error) {
-	p, m, err := DecodeString(b[n:])
+func (cp ConnectPacket) DecodeProtocolName() error {
+	p := cp.DecodeString()
 	cp.ProtocolName = p
-	return n + m, err
+	return nil
 }
 
-func (cp ConnectPacket) EncodeProtocolName(b []byte) ([]byte, error) {
-	return EncodeString(b, cp.ProtocolName)
+func (cp ConnectPacket) EncodeProtocolName() error {
+	return cp.EncodeString(cp.ProtocolName)
 }
 
-func (cp ConnectPacket) DecodeProtocolVersion(b []byte, n int) (int, error) {
-	v, m, err := DecodeByte(b[n:])
+func (cp ConnectPacket) DecodeProtocolVersion() error {
+	v, err := cp.DecodeByte()
+	if err != nil {
+		return err
+	}
 	cp.ProtocolVersion = v
-	return n + m, err
+	return nil
 }
 
-func (cp ConnectPacket) EncodeProtocolVersion(b []byte) ([]byte, error) {
-	return EncodeByte(b, cp.ProtocolVersion)
+func (cp ConnectPacket) EncodeProtocolVersion() error {
+	return cp.EncodeByte(cp.ProtocolVersion)
 }
 
-func (cp ConnectPacket) DecodeConnectFlags(b []byte, n int) (int, error) {
-	fb := b[n]
+func (cp ConnectPacket) DecodeConnectFlags() error {
+	fb, err := cp.DecodeByte()
+	if err != nil {
+		return err
+	}
 	cp.UsernameFlag = fb>>6 > 0
 	cp.PasswordFlag = (fb&0x40)>>5 > 0
 	cp.WillRetainFlag = (fb&0x20)>>4 > 0
 	cp.WillQoSFlag = (fb & 0x18) >> 3
 	cp.WillFlag = fb>>6 > 0
 	cp.CleanStartFlag = fb>>7 > 0
-	return n + 1, nil
+	return nil
 }
 
 func (cp ConnectPacket) EncodeConnectFlags(b []byte) ([]byte, error) {
@@ -138,32 +155,29 @@ func (cp ConnectPacket) EncodeConnectFlags(b []byte) ([]byte, error) {
 	return append(b, flags), nil
 }
 
-func (cp ConnectPacket) DecodeKeepAlive(b []byte, n int) (int, error) {
-	ka, m, err := DecodeTwoByteInt(b[n:])
-	if err != nil {
-		return -1, err
-	}
+func (cp ConnectPacket) DecodeKeepAlive() error {
+	ka := cp.DecodeTwoByteInt()
 	cp.KeepAlive = ka
-	return n + m, nil
+	return nil
 }
 
 func (cp ConnectPacket) EncodeKeepAlive(b []byte) ([]byte, error) {
 	return EncodeTwoByteInt(b, cp.KeepAlive)
 }
 
-func (cp ConnectPacket) DecodePayload(b []byte, n int) error {
+func (cp ConnectPacket) DecodePayload() error {
 
-	n, err := cp.DecodeClientID(b, n)
+	err := cp.DecodeClientID()
 	if err != nil {
 		return err
 	}
 	// If willflag is set to 1, fill topic is the next in the payload.
 	if cp.WillFlag {
-		n, err = cp.DecodeWillTopic(b, n)
+		err = cp.DecodeWillTopic()
 		if err != nil {
 			return err
 		}
-		n, err = cp.DecodeWillMessage(b, n)
+		err = cp.DecodeWillMessage()
 		if err != nil {
 			return err
 		}
@@ -171,11 +185,11 @@ func (cp ConnectPacket) DecodePayload(b []byte, n int) error {
 
 	// If Username is set, username and password are next in the payload.
 	if cp.UsernameFlag {
-		n, err = cp.DecodeUsername(b, n)
+		err = cp.DecodeUsername()
 		if err != nil {
 			return err
 		}
-		n, err = cp.DecodePassword(b, n)
+		err = cp.DecodePassword()
 		if err != nil {
 			return err
 		}
@@ -184,55 +198,29 @@ func (cp ConnectPacket) DecodePayload(b []byte, n int) error {
 	return nil
 }
 
-func (cp ConnectPacket) DecodeWillTopic(b []byte, n int) (int, error) {
-	topic, m, err := DecodeString(b[n:])
-	if err != nil {
-		return -1, err
-	}
-	cp.WillTopic = topic
-	return m + n, nil
-
+func (cp ConnectPacket) DecodeWillTopic() error {
+	cp.WillTopic = cp.DecodeString()
+	return nil
 }
 
-func (cp ConnectPacket) DecodeWillMessage(b []byte, n int) (int, error) {
-
-	messageLength, m, err := DecodeTwoByteInt(b[n:])
-	n = n + m // Moving past the will message length.
-
-	cp.WillPayload, m, err = DecodeBinaryData(b[n : n+int(messageLength)])
-	if err != nil {
-		return -1, err
-	}
-	return n + m, nil
+func (cp ConnectPacket) DecodeWillMessage() error {
+	cp.WillPayload = cp.DecodeBinaryData()
+	return nil
 }
 
-func (cp ConnectPacket) DecodeUsername(b []byte, n int) (int, error) {
-	username, m, err := DecodeString(b[n:])
-	if err != nil {
-		return -1, err
-	}
-	cp.Username = username
-	return m + n, nil
+func (cp ConnectPacket) DecodeUsername() error {
+	cp.Username = cp.DecodeString()
+	return nil
 }
 
-func (cp ConnectPacket) DecodePassword(b []byte, n int) (int, error) {
-	messageLength, m, err := DecodeTwoByteInt(b[n:])
-	n = n + m // Moving past the password length.
-
-	cp.Password, m, err = DecodeBinaryData(b[n : n+int(messageLength)])
-	if err != nil {
-		return -1, err
-	}
-	return n + m, nil
+func (cp ConnectPacket) DecodePassword() error {
+	cp.Password = cp.DecodeBinaryData()
+	return nil
 }
 
-func (cp ConnectPacket) DecodeClientID(b []byte, n int) (int, error) {
-	clientId, n, err := DecodeString(b[n:])
-	if err != nil {
-		return -1, err
-	}
-	cp.ClientID = clientId
-	return n, nil
+func (cp ConnectPacket) DecodeClientID() error {
+	cp.ClientID = cp.DecodeString()
+	return nil
 }
 
 func (cp ConnectPacket) EncodeClientID(b []byte) ([]byte, error) {
@@ -240,105 +228,101 @@ func (cp ConnectPacket) EncodeClientID(b []byte) ([]byte, error) {
 }
 
 func (cp ConnectPacket) Encode() ([]byte, error) {
-	var b []byte
 
 	// Starting from the variable header, fixed header is last.
 
-	b, err := EncodeString(b, "MQTT")
+	err := cp.EncodeString("MQTT")
 	if err != nil {
 		return nil, err
 	}
 
 	// Protocol Level revision level used by this client, we are using revision 4
-	b, err = EncodeByte(b, uint8(4))
+	err = cp.EncodeByte(uint8(4))
 	if err != nil {
 		return nil, err
 	}
 
 	// Keepalive of the packet
-	b, err = EncodeTwoByteInt(b, cp.KeepAlive)
+	err = cp.EncodeTwoByteInt(cp.KeepAlive)
 	if err != nil {
 		return nil, err
 	}
 
 	// Encoding the Client Identifier
-	b, err = EncodeString(b, cp.ClientID)
+	err = cp.EncodeString(cp.ClientID)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO Implement all the will bullshit.
-
-	//Encoding the FixedHeader
-	cp.FixedHeader.RemaningLength = len(b)
-	fhb, err := cp.FixedHeader.EncodeFixedHeader()
-	if err != nil {
-		return nil, err
-	}
-
-	return append(fhb, b...), nil
+	return cp.EncodeFixedHeader()
 }
 
 func (cp ConnackPacket) Encode() ([]byte, error) {
+	if err := cp.EncodeByte(cp.SessionPresent); err != nil {
+		return nil, err
+	}
+
+	if err := cp.EncodeByte(cp.ReturnCode); err != nil {
+		return nil, err
+	}
+
 	//Connack is just the fixed header and the return code.
-	b, err := cp.FixedHeader.EncodeFixedHeader()
-	b = append(b, cp.SessionPresent)
-	return append(b, cp.ReturnCode), err
+	return cp.EncodeFixedHeader()
 }
 
 func Accepted() ConnackPacket {
-	fh := &FixedHeader{
+	p := &Packet{
 		RemaningLength: 2,
 		Type:           CONNACK,
 	}
 	return ConnackPacket{
-		FixedHeader:    fh,
+		Packet:         p,
 		SessionPresent: 1,
 		ReturnCode:     ConnectionAccepted}
 }
 func BadProtocolVersion() ConnackPacket {
-	fh := &FixedHeader{
+	p := &Packet{
 		RemaningLength: 2,
 		Type:           CONNACK,
 	}
-	return ConnackPacket{FixedHeader: fh,
+	return ConnackPacket{Packet: p,
 		SessionPresent: 0,
 		ReturnCode:     UnnaceptableProtocolVersion}
 }
 
 func InvalidIdentifier() ConnackPacket {
-	fh := &FixedHeader{
+	p := &Packet{
 		RemaningLength: 2,
 		Type:           CONNACK,
 	}
-	return ConnackPacket{FixedHeader: fh,
+	return ConnackPacket{Packet: p,
 		SessionPresent: 0,
 		ReturnCode:     IdentifierRejected}
 }
 func ServiceUnavailable() ConnackPacket {
-	fh := &FixedHeader{
+	p := &Packet{
 		RemaningLength: 2,
 		Type:           CONNACK,
 	}
-	return ConnackPacket{FixedHeader: fh,
+	return ConnackPacket{Packet: p,
 		SessionPresent: 0,
 		ReturnCode:     ServerUnavailable}
 }
 func BadAuth() ConnackPacket {
-	fh := &FixedHeader{
+	p := &Packet{
 		RemaningLength: 2,
 		Type:           CONNACK,
 	}
-	return ConnackPacket{FixedHeader: fh,
+	return ConnackPacket{Packet: p,
 		SessionPresent: 0,
 		ReturnCode:     BadUsernameOrPassword}
 }
 func NotAuth() ConnackPacket {
-	fh := &FixedHeader{
+	p := &Packet{
 		RemaningLength: 2,
 		Type:           CONNACK,
 	}
-	return ConnackPacket{FixedHeader: fh,
+	return ConnackPacket{Packet: p,
 		SessionPresent: 0,
 		ReturnCode:     NotAuthorised}
 }

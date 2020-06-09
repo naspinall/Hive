@@ -6,7 +6,7 @@ type Topic struct {
 }
 
 type SubscribePacket struct {
-	FixedHeader *FixedHeader
+	*Packet
 	PacketIdentifier
 
 	//Payload Properties
@@ -14,103 +14,96 @@ type SubscribePacket struct {
 }
 
 type SubAckPacket struct {
-	FixedHeader *FixedHeader
+	*Packet
 	PacketIdentifier
 	ReturnCode byte
 }
 
-func NewSubAckPacket(fh *FixedHeader, b []byte) (*SubAckPacket, error) {
-	sap := &SubAckPacket{}
-	n, err := sap.DecodePacketIdentifier(b, 2)
+func NewSubAckPacket(p *Packet) (*SubAckPacket, error) {
+	sap := &SubAckPacket{
+		Packet: p,
+	}
+	err := sap.DecodePacketIdentifier()
 	if err != nil {
 		return nil, err
 	}
-	sap.ReturnCode, n, err = DecodeByte(b[n:])
+	sap.ReturnCode, err = sap.DecodeByte()
 	return sap, nil
 
 }
 
-func NewSubscribePacket(fh *FixedHeader, b []byte) (*SubscribePacket, error) {
-	sp := &SubscribePacket{FixedHeader: fh}
-	n, err := sp.DecodePacketIdentifier(b, 0)
-	if err = sp.DecodeTopics(b, n); err != nil {
+func NewSubscribePacket(p *Packet) (*SubscribePacket, error) {
+	sp := &SubscribePacket{
+		Packet: p,
+	}
+	err := sp.DecodePacketIdentifier()
+	if err = sp.DecodeTopics(); err != nil {
 		return nil, err
 	}
 	return sp, nil
 }
 
-func (sp *SubscribePacket) DecodeTopics(b []byte, n int) (err error) {
-	for n < int(sp.FixedHeader.RemaningLength) {
-		topic, sl, err := DecodeString(b[n:])
+func (sp *SubscribePacket) DecodeTopics() error {
+	// Reconsider this.
+	for sp.buff.Len() > 0 {
+		topic := sp.DecodeString()
+		qos, err := sp.DecodeByte()
 		if err != nil {
 			return err
 		}
-		qos, _, err := DecodeByte(b[n:])
 		sp.Topics = append(sp.Topics, Topic{
 			Topic: topic,
 			QoS:   qos,
 		})
-		n += sl + 1
 	}
 
 	return nil
 }
 
-func (sp *SubscribePacket) EncodeTopics(b []byte) ([]byte, error) {
+func (sp *SubscribePacket) EncodeTopics() error {
 	for _, topic := range sp.Topics {
-		b, err := EncodeString(b, topic.Topic)
-		if err != nil {
-			return nil, err
+		if err := sp.EncodeString(topic.Topic); err != nil {
+
+			return err
 		}
-		b, err = EncodeByte(b, topic.QoS)
-		if err != nil {
-			return nil, err
+		if err := sp.EncodeByte(topic.QoS); err != nil {
+			return err
 		}
+
 	}
-	return b, nil
+	return nil
 }
 
 func (sp *SubscribePacket) Encode() ([]byte, error) {
-	var b []byte
 
 	// Packet identifier
-	b, err := sp.EncodePacketIdentifier(b)
-	if err != nil {
+	if err := sp.EncodePacketIdentifier(); err != nil {
 		return nil, err
 	}
 
 	// Encode the topics
-	b, err = sp.EncodeTopics(b)
-	if err != nil {
+	if err := sp.EncodeTopics(); err != nil {
 		return nil, err
 	}
 
 	// Encode the QoS byte.
-	b, err = EncodeByte(b, sp.FixedHeader.Flags.QoS)
+	sp.EncodeByte(sp.Flags.QoS)
 
-	// Prepending the fixed header
-	sp.FixedHeader.RemaningLength = len(b)
-	return sp.FixedHeader.PrependFixedHeader(b)
+	return sp.EncodeFixedHeader()
 }
 
 func (sp *SubAckPacket) Encode() ([]byte, error) {
-	var b []byte
-
-	b, err := sp.EncodePacketIdentifier(b)
-	if err != nil {
+	if err := sp.EncodePacketIdentifier(); err != nil {
 		return nil, err
 	}
 
-	b, err = sp.EncodePacketIdentifier(b)
-	if err != nil {
+	if err := sp.EncodePacketIdentifier(); err != nil {
 		return nil, err
 	}
 
-	b, err = EncodeByte(b, sp.ReturnCode)
-	if err != nil {
+	if err := sp.EncodeByte(sp.ReturnCode); err != nil {
 		return nil, err
 	}
 
-	// TODO finish this.
-	return b, err
+	return sp.EncodeFixedHeader()
 }

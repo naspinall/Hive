@@ -1,11 +1,12 @@
 package packets
 
 import (
+	"bytes"
 	"reflect"
 	"testing"
 )
 
-func TestNewFixedHeader(t *testing.T) {
+func TestNewPacket(t *testing.T) {
 
 	type args struct {
 		header uint8
@@ -13,14 +14,14 @@ func TestNewFixedHeader(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    *FixedHeader
+		want    *Packet
 		wantErr bool
 	}{
 		{name: "Reserved Test",
 			args: args{
 				header: 0,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  Reserved,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -28,7 +29,7 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 16,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  CONNECT,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -36,7 +37,7 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 32,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  CONNACK,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -44,7 +45,7 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 48,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  PUBLISH,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -52,7 +53,7 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 64,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  PUBACK,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -60,7 +61,7 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 80,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  PUBREC,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -68,7 +69,7 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 96,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  PUBREL,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -76,7 +77,7 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 112,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  PUBCOMP,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -84,7 +85,7 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 128,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  SUBSCRIBE,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -92,7 +93,7 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 144,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  SUBACK,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -100,7 +101,7 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 160,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  UNSUBSCRIBE,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -108,7 +109,7 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 176,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  UNSUBACK,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -116,7 +117,7 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 192,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  PINGREQ,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -124,7 +125,7 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 208,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  PINGRESP,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -132,7 +133,7 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 224,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  DISCONNECT,
 				Flags: FixedHeaderFlags{},
 			}},
@@ -140,20 +141,20 @@ func TestNewFixedHeader(t *testing.T) {
 			args: args{
 				header: 240,
 			},
-			want: &FixedHeader{
+			want: &Packet{
 				Type:  AUTH,
 				Flags: FixedHeaderFlags{},
 			}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewFixedHeader(tt.args.header, tt.args.header)
+			got, err := NewMQTTPacket([]byte{tt.args.header, 0})
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewFixedHeader() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NewPacket() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewFixedHeader() = %v, want %v", got, tt.want)
+			if got.Type != tt.want.Type {
+				t.Errorf("Type = %v, want %v", got.Type, tt.want.Type)
 			}
 		})
 	}
@@ -161,7 +162,7 @@ func TestNewFixedHeader(t *testing.T) {
 
 func TestDecodeByte(t *testing.T) {
 	type args struct {
-		b []byte
+		b *bytes.Buffer
 	}
 	tests := []struct {
 		name    string
@@ -173,16 +174,16 @@ func TestDecodeByte(t *testing.T) {
 		{
 			name: "Decode a byte",
 			args: args{
-				b: []byte{1},
+				b: bytes.NewBuffer([]byte{1}),
 			},
 			want:    1,
-			want1:   1,
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := DecodeByte(tt.args.b)
+			p := &Packet{buff: tt.args.b}
+			got, err := p.DecodeByte()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DecodeByte() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -190,16 +191,13 @@ func TestDecodeByte(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("DecodeByte() got = %v, want %v", got, tt.want)
 			}
-			if got1 != tt.want1 {
-				t.Errorf("DecodeByte() got1 = %v, want %v", got1, tt.want1)
-			}
 		})
 	}
 }
 
 func TestDecodeFourByteInt(t *testing.T) {
 	type args struct {
-		b []byte
+		b *bytes.Buffer
 	}
 	tests := []struct {
 		name    string
@@ -211,7 +209,7 @@ func TestDecodeFourByteInt(t *testing.T) {
 		{
 			name: "Decode a four byte integer",
 			args: args{
-				b: []byte{0, 0, 0, 16},
+				b: bytes.NewBuffer([]byte{0, 0, 0, 16}),
 			},
 			want:    16,
 			want1:   4,
@@ -220,7 +218,7 @@ func TestDecodeFourByteInt(t *testing.T) {
 		{
 			name: "Decode a four byte integer",
 			args: args{
-				b: []byte{0, 0, 0, 32},
+				b: bytes.NewBuffer([]byte{0, 0, 0, 32}),
 			},
 			want:    32,
 			want1:   4,
@@ -229,16 +227,10 @@ func TestDecodeFourByteInt(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := DecodeFourByteInt(tt.args.b)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("DecodeFourByteInt() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			p := &Packet{buff: tt.args.b}
+			got := p.DecodeFourByteInt()
 			if got != tt.want {
 				t.Errorf("DecodeFourByteInt() got = %v, want %v", got, tt.want)
-			}
-			if got1 != tt.want1 {
-				t.Errorf("DecodeFourByteInt() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}
@@ -246,7 +238,7 @@ func TestDecodeFourByteInt(t *testing.T) {
 
 func TestDecodeTwoByteInt(t *testing.T) {
 	type args struct {
-		b []byte
+		b *bytes.Buffer
 	}
 	tests := []struct {
 		name    string
@@ -258,7 +250,7 @@ func TestDecodeTwoByteInt(t *testing.T) {
 		{
 			name: "Decode a two byte integer",
 			args: args{
-				b: []byte{0, 16},
+				b: bytes.NewBuffer([]byte{0, 16}),
 			},
 			want:    16,
 			want1:   2,
@@ -267,16 +259,10 @@ func TestDecodeTwoByteInt(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := DecodeTwoByteInt(tt.args.b)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("DecodeTwoByteInt() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			p := &Packet{buff: tt.args.b}
+			got := p.DecodeTwoByteInt()
 			if got != tt.want {
 				t.Errorf("DecodeTwoByteInt() got = %v, want %v", got, tt.want)
-			}
-			if got1 != tt.want1 {
-				t.Errorf("DecodeTwoByteInt() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}
@@ -284,7 +270,7 @@ func TestDecodeTwoByteInt(t *testing.T) {
 
 func TestDecodeBinaryData(t *testing.T) {
 	type args struct {
-		b []byte
+		b *bytes.Buffer
 	}
 	tests := []struct {
 		name    string
@@ -296,7 +282,7 @@ func TestDecodeBinaryData(t *testing.T) {
 		{
 			name: "Decode binary data",
 			args: args{
-				b: []byte{0, 4, 2, 3, 4, 5},
+				b: bytes.NewBuffer([]byte{0, 4, 2, 3, 4, 5}),
 			},
 			want:    []byte{2, 3, 4, 5},
 			want1:   6,
@@ -305,16 +291,10 @@ func TestDecodeBinaryData(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := DecodeBinaryData(tt.args.b)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("DecodeBinaryData() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			p := &Packet{buff: tt.args.b}
+			got := p.DecodeBinaryData()
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DecodeBinaryData() got = %v, want %v", got, tt.want)
-			}
-			if got1 != tt.want1 {
-				t.Errorf("DecodeBinaryData() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}
@@ -326,7 +306,7 @@ func TestDecodeStringPair(t *testing.T) {
 	testByteArray = append(testByteArray, 0, 23)
 	testByteArray = append(testByteArray, []byte("Here is another string")...)
 	type args struct {
-		b []byte
+		b *bytes.Buffer
 	}
 	tests := []struct {
 		name    string
@@ -338,7 +318,7 @@ func TestDecodeStringPair(t *testing.T) {
 		{
 			name: "Decode a two byte integer",
 			args: args{
-				b: testByteArray,
+				b: bytes.NewBuffer(testByteArray),
 			},
 			want: &StringPair{
 				name:  "Here is a string",
@@ -350,16 +330,10 @@ func TestDecodeStringPair(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := DecodeStringPair(tt.args.b)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("DecodeStringPair() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			p := &Packet{buff: tt.args.b}
+			got := p.DecodeStringPair()
 			if got.name != tt.want.name && got.value != tt.want.value {
 				t.Errorf("DecodeStringPair() got = %v, want %v", got, tt.want.name)
-			}
-			if got1 != tt.want1 {
-				t.Errorf("DecodeStringPair() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}
@@ -369,7 +343,7 @@ func TestDecodeString(t *testing.T) {
 	testByteArray := []byte{0, 16}
 	testByteArray = append(testByteArray, []byte("Here is a string")...)
 	type args struct {
-		b []byte
+		b *bytes.Buffer
 	}
 	tests := []struct {
 		name    string
@@ -381,7 +355,7 @@ func TestDecodeString(t *testing.T) {
 		{
 			name: "Decode a two byte integer",
 			args: args{
-				b: testByteArray,
+				b: bytes.NewBuffer(testByteArray),
 			},
 			want:    "Here is a string",
 			want1:   18,
@@ -390,17 +364,13 @@ func TestDecodeString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := DecodeString(tt.args.b)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("DecodeString() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			p := &Packet{buff: tt.args.b}
+			got := p.DecodeString()
+
 			if got != tt.want {
 				t.Errorf("DecodeString() got = %v, want %v", got, tt.want)
 			}
-			if got1 != tt.want1 {
-				t.Errorf("DecodeString() got1 = %v, want %v", got1, tt.want1)
-			}
+
 		})
 	}
 }

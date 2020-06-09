@@ -1,65 +1,64 @@
 package packets
 
 type PublishPacket struct {
-	FixedHeader      *FixedHeader
+	*Packet
 	TopicName        string
 	PacketIdentifier uint16
 	Payload          []byte
 }
 
 type PublishQoSPacket struct {
-	FixedHeader *FixedHeader
+	*Packet
 	PacketIdentifier
 }
 
-func NewPublishQoSPacket(fh *FixedHeader, b []byte) (*PublishQoSPacket, error) {
+func NewPublishQoSPacket(p *Packet) (*PublishQoSPacket, error) {
 	pqp := &PublishQoSPacket{
-		FixedHeader: fh,
+		Packet: p,
 	}
-	_, err := pqp.DecodePacketIdentifier(b, 2)
+	err := pqp.DecodePacketIdentifier()
 	if err != nil {
 		return nil, err
 	}
 	return pqp, nil
 }
 
-func NewPublishPacket(fh *FixedHeader, b []byte) (*PublishPacket, error) {
+func NewPublishPacket(p *Packet) (*PublishPacket, error) {
 	pp := &PublishPacket{
-		FixedHeader: fh,
+		Packet: p,
 	}
-	n, err := pp.DecodeTopicName(b, 0)
+	err := pp.DecodeTopicName()
 	if err != nil {
 		return nil, err
 	}
 
-	n, err = pp.DecodePacketIdentifier(b, n)
+	err = pp.DecodePacketIdentifier()
 	if err != nil {
 		return nil, err
 	}
 
-	pp.Payload = (b[n:])
+	pp.Payload = pp.DecodeBinaryData()
 	return pp, nil
 }
 
-func (pp *PublishPacket) DecodeTopicName(b []byte, n int) (m int, err error) {
-	pp.TopicName, m, err = DecodeString(b[n:])
-	return
+func (pp *PublishPacket) DecodeTopicName() error {
+	pp.TopicName = pp.DecodeString()
+	return nil
 }
 
 func (pp *PublishPacket) EncodeTopicName(b []byte) ([]byte, error) {
 	return EncodeString(b, pp.TopicName)
 }
 
-func (pp *PublishPacket) DecodePacketIdentifier(b []byte, n int) (m int, err error) {
-	if pp.FixedHeader.Flags.QoS > 0 {
-		pp.PacketIdentifier, m, err = DecodeTwoByteInt(b[n:])
-		m = m + n
+func (pp *PublishPacket) DecodePacketIdentifier() error {
+	if pp.Flags.QoS > 0 {
+		pp.PacketIdentifier = pp.DecodeTwoByteInt()
 	}
-	return
+	return nil
 }
 
 func (pp *PublishPacket) EncodePacketIdentifier(b []byte) ([]byte, error) {
-	if pp.FixedHeader.Flags.QoS > 0 {
+	if pp.Flags.QoS > 0 {
 		return EncodeTwoByteInt(b, pp.PacketIdentifier)
 	}
 	return b, nil
@@ -80,24 +79,17 @@ func (pp *PublishPacket) Encode(b []byte) ([]byte, error) {
 	// Payload next
 	b = append(b, pp.Payload...)
 
-	fhb, err := pp.FixedHeader.EncodeFixedHeader()
-	if err != nil {
-		return nil, err
-	}
-	return append(fhb, b...), err
+	return pp.EncodeFixedHeader()
 }
 
-func (pq *PublishQoSPacket) Encode(b []byte) ([]byte, error) {
-	b, err := pq.FixedHeader.EncodeFixedHeader()
-	if err != nil {
-		return nil, err
-	}
-	return pq.EncodePacketIdentifier(b)
+func (pq *PublishQoSPacket) Encode() ([]byte, error) {
+	pq.EncodeTwoByteInt(pq.PacketIdentifier.PacketIdentifier)
+	return pq.EncodeFixedHeader()
 }
 
 func Acknowledge(i uint16) *PublishQoSPacket {
 	return &PublishQoSPacket{
-		FixedHeader: &FixedHeader{
+		Packet: &Packet{
 			Type:           4,
 			RemaningLength: 2,
 		},
@@ -110,7 +102,7 @@ func Acknowledge(i uint16) *PublishQoSPacket {
 
 func Received(i uint16) *PublishQoSPacket {
 	return &PublishQoSPacket{
-		FixedHeader: &FixedHeader{
+		Packet: &Packet{
 			Type:           5,
 			RemaningLength: 2,
 		},
@@ -123,7 +115,7 @@ func Received(i uint16) *PublishQoSPacket {
 
 func Complete(i uint16) *PublishQoSPacket {
 	return &PublishQoSPacket{
-		FixedHeader: &FixedHeader{
+		Packet: &Packet{
 			Type:           6,
 			RemaningLength: 2,
 		},

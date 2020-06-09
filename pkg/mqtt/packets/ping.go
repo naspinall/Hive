@@ -1,20 +1,20 @@
 package packets
 
 type PingPacket struct {
-	FixedHeader *FixedHeader
+	*Packet
 }
 
-func NewPingPacket(fh *FixedHeader) *PingPacket {
-	return &PingPacket{FixedHeader: fh}
+func NewPingPacket() *PingPacket {
+	return &PingPacket{}
 }
 
 func (prp PingPacket) Encode() ([]byte, error) {
-	return prp.FixedHeader.EncodeFixedHeader()
+	return prp.EncodeFixedHeader()
 }
 
 func PingRequest() *PingPacket {
 	return &PingPacket{
-		FixedHeader: &FixedHeader{
+		Packet: &Packet{
 			Type:           12,
 			RemaningLength: 0,
 		},
@@ -23,7 +23,7 @@ func PingRequest() *PingPacket {
 
 func PingResponse() *PingPacket {
 	return &PingPacket{
-		FixedHeader: &FixedHeader{
+		Packet: &Packet{
 			Type:           13,
 			RemaningLength: 0,
 		},
