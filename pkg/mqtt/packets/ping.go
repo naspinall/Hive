@@ -1,5 +1,7 @@
 package packets
 
+import "bytes"
+
 type PingPacket struct {
 	*Packet
 }
@@ -17,6 +19,7 @@ func PingRequest() *PingPacket {
 		Packet: &Packet{
 			Type:           12,
 			RemaningLength: 0,
+			buff:           &bytes.Buffer{},
 		},
 	}
 }
@@ -26,6 +29,7 @@ func PingResponse() *PingPacket {
 		Packet: &Packet{
 			Type:           13,
 			RemaningLength: 0,
+			buff:           &bytes.Buffer{},
 		},
 	}
 }

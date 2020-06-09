@@ -1,5 +1,7 @@
 package packets
 
+import "bytes"
+
 type WillProperties struct {
 	WillDelayInterval      uint32
 	PayloadFormatIndicator bool
@@ -161,8 +163,8 @@ func (cp ConnectPacket) DecodeKeepAlive() error {
 	return nil
 }
 
-func (cp ConnectPacket) EncodeKeepAlive(b []byte) ([]byte, error) {
-	return EncodeTwoByteInt(b, cp.KeepAlive)
+func (cp ConnectPacket) EncodeKeepAlive() error {
+	return cp.EncodeTwoByteInt(cp.KeepAlive)
 }
 
 func (cp ConnectPacket) DecodePayload() error {
@@ -223,8 +225,8 @@ func (cp ConnectPacket) DecodeClientID() error {
 	return nil
 }
 
-func (cp ConnectPacket) EncodeClientID(b []byte) ([]byte, error) {
-	return EncodeString(b, cp.ClientID)
+func (cp ConnectPacket) EncodeClientID() error {
+	return cp.EncodeString(cp.ClientID)
 }
 
 func (cp ConnectPacket) Encode() ([]byte, error) {
@@ -274,55 +276,68 @@ func Accepted() ConnackPacket {
 	p := &Packet{
 		RemaningLength: 2,
 		Type:           CONNACK,
+		buff:           &bytes.Buffer{},
 	}
+
 	return ConnackPacket{
 		Packet:         p,
 		SessionPresent: 1,
-		ReturnCode:     ConnectionAccepted}
+		ReturnCode:     ConnectionAccepted,
+	}
 }
 func BadProtocolVersion() ConnackPacket {
 	p := &Packet{
 		RemaningLength: 2,
 		Type:           CONNACK,
+		buff:           &bytes.Buffer{},
 	}
 	return ConnackPacket{Packet: p,
 		SessionPresent: 0,
-		ReturnCode:     UnnaceptableProtocolVersion}
+		ReturnCode:     UnnaceptableProtocolVersion,
+	}
 }
 
 func InvalidIdentifier() ConnackPacket {
 	p := &Packet{
 		RemaningLength: 2,
 		Type:           CONNACK,
+		buff:           &bytes.Buffer{},
 	}
 	return ConnackPacket{Packet: p,
 		SessionPresent: 0,
-		ReturnCode:     IdentifierRejected}
+		ReturnCode:     IdentifierRejected,
+	}
 }
 func ServiceUnavailable() ConnackPacket {
 	p := &Packet{
 		RemaningLength: 2,
 		Type:           CONNACK,
+		buff:           &bytes.Buffer{},
 	}
 	return ConnackPacket{Packet: p,
 		SessionPresent: 0,
-		ReturnCode:     ServerUnavailable}
+		ReturnCode:     ServerUnavailable,
+	}
 }
 func BadAuth() ConnackPacket {
 	p := &Packet{
 		RemaningLength: 2,
 		Type:           CONNACK,
+		buff:           &bytes.Buffer{},
 	}
 	return ConnackPacket{Packet: p,
 		SessionPresent: 0,
-		ReturnCode:     BadUsernameOrPassword}
+		ReturnCode:     BadUsernameOrPassword,
+	}
 }
 func NotAuth() ConnackPacket {
 	p := &Packet{
 		RemaningLength: 2,
 		Type:           CONNACK,
+		buff:           &bytes.Buffer{},
 	}
 	return ConnackPacket{Packet: p,
 		SessionPresent: 0,
-		ReturnCode:     NotAuthorised}
+		ReturnCode:     NotAuthorised,
+	}
 }

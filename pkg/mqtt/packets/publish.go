@@ -1,5 +1,7 @@
 package packets
 
+import "bytes"
+
 type PublishPacket struct {
 	*Packet
 	TopicName        string
@@ -46,8 +48,9 @@ func (pp *PublishPacket) DecodeTopicName() error {
 	return nil
 }
 
-func (pp *PublishPacket) EncodeTopicName(b []byte) ([]byte, error) {
-	return EncodeString(b, pp.TopicName)
+func (pp *PublishPacket) EncodeTopicName() error {
+	pp.EncodeString(pp.TopicName)
+	return nil
 }
 
 func (pp *PublishPacket) DecodePacketIdentifier() error {
@@ -57,28 +60,24 @@ func (pp *PublishPacket) DecodePacketIdentifier() error {
 	return nil
 }
 
-func (pp *PublishPacket) EncodePacketIdentifier(b []byte) ([]byte, error) {
+func (pp *PublishPacket) EncodePacketIdentifier() error {
 	if pp.Flags.QoS > 0 {
-		return EncodeTwoByteInt(b, pp.PacketIdentifier)
+		return pp.EncodeTwoByteInt(pp.PacketIdentifier)
 	}
-	return b, nil
+	return nil
 }
 
-func (pp *PublishPacket) Encode(b []byte) ([]byte, error) {
+func (pp *PublishPacket) Encode() ([]byte, error) {
 	// Variable header starts with the topic name
-	b, err := pp.EncodeTopicName(b)
-	if err != nil {
+	if err := pp.EncodeTopicName(); err != nil {
 		return nil, err
 	}
 	// Packet identifier next
-	b, err = pp.EncodePacketIdentifier(b)
-	if err != nil {
+	if err := pp.EncodePacketIdentifier(); err != nil {
 		return nil, err
 	}
 
-	// Payload next
-	b = append(b, pp.Payload...)
-
+	pp.EncodeBinary(pp.Payload)
 	return pp.EncodeFixedHeader()
 }
 
@@ -92,6 +91,7 @@ func Acknowledge(i uint16) *PublishQoSPacket {
 		Packet: &Packet{
 			Type:           4,
 			RemaningLength: 2,
+			buff:           &bytes.Buffer{},
 		},
 		// This is a bit ridiculous
 		PacketIdentifier: PacketIdentifier{
@@ -105,6 +105,7 @@ func Received(i uint16) *PublishQoSPacket {
 		Packet: &Packet{
 			Type:           5,
 			RemaningLength: 2,
+			buff:           &bytes.Buffer{},
 		},
 		// This is a bit ridiculous
 		PacketIdentifier: PacketIdentifier{
@@ -118,6 +119,7 @@ func Complete(i uint16) *PublishQoSPacket {
 		Packet: &Packet{
 			Type:           6,
 			RemaningLength: 2,
+			buff:           &bytes.Buffer{},
 		},
 		// This is a bit ridiculous
 		PacketIdentifier: PacketIdentifier{
