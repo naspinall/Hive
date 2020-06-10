@@ -56,14 +56,8 @@ func (mqtt *MQTT) Subscribe(topic string, handler SubscribeHandler) {
 
 func (mqtt *MQTT) HandleNewConn(conn net.Conn) {
 	b := make([]byte, 4096)
-	n, err := conn.Read(b)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("Read %d byte from new connection", n)
-
-	// Decoding packets
-	fh, err := packets.NewFixedHeader(b)
+	_, err := conn.Read(b)
+	p, err := packets.NewMQTTPacket(b)
 	if err != nil {
 		log.Println(err)
 		conn.Close()
@@ -71,8 +65,8 @@ func (mqtt *MQTT) HandleNewConn(conn net.Conn) {
 	}
 
 	// Checking if first packet sent is a connect packet
-	if fh.Type != packets.CONNECT {
-		log.Println("Bad packet send")
+	if p.Type != packets.CONNECT {
+		log.Println("Inital packet is not a connect packet")
 		conn.Close()
 		return
 	}
@@ -87,12 +81,13 @@ func (mqtt *MQTT) HandleNewConn(conn net.Conn) {
 
 	// Sending accepted response
 	cb, err := packets.Accepted().Encode()
+	log.Println("Sending Accept")
 	if err != nil {
 		log.Println("Cannot encode Accepted packet")
 		conn.Close()
 		return
 	}
-	n, err = c.Conn.Write(cb)
+	_, err = c.Conn.Write(cb)
 	if err != nil {
 		log.Println(err)
 		conn.Close()
@@ -117,36 +112,39 @@ func (mqtt *MQTT) NewConnection(conn net.Conn, deviceID uint) (*Connection, erro
 
 func (mqtt *MQTT) HandleConnection(c *Connection) {
 	for {
-		fh, b, err := c.ProcessFixedHeader()
+		b := make([]byte, 4096)
+		_, err := c.Conn.Read(b)
+		p, err := packets.NewMQTTPacket(b)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		switch fh.Type {
+		switch p.Type {
 		case packets.PUBLISH:
-			pp, err := packets.NewPublishPacket(fh, b)
+			pp, err := packets.NewPublishPacket(p)
 			if err != nil {
 				log.Println(err)
 			}
-			switch pp.FixedHeader.Flags.QoS {
+			switch pp.Flags.QoS {
 			case 1:
-				b := make([]byte, 4)
-				if _, err := packets.Acknowledge(pp.PacketIdentifier).Encode(b); err != nil {
+				b, err := packets.Acknowledge(pp.PacketIdentifier).Encode()
+				if err != nil {
 					log.Println("Back Ack packet encoding")
 				}
 				c.Conn.Write(b)
 			case 2:
-				b := make([]byte, 4)
-				if _, err := packets.Received(pp.PacketIdentifier).Encode(b); err != nil {
+				b, err := packets.Received(pp.PacketIdentifier).Encode()
+				if err != nil {
 					log.Println("Back Ack packet encoding")
 				}
 				c.Conn.Write(b)
 				rc := make(chan uint16)
 				timeOut := time.NewTimer(500 * time.Microsecond)
-				go c.PublishQos(rc)
+
 				select {
 				case pi := <-rc:
-					if _, err := packets.Complete(pi).Encode(b); err != nil {
+					b, err := packets.Complete(pi).Encode()
+					if err != nil {
 						log.Println("Back Ack packet encoding")
 					}
 					c.Conn.Write(b)
@@ -161,7 +159,7 @@ func (mqtt *MQTT) HandleConnection(c *Connection) {
 			}
 
 		case packets.SUBSCRIBE:
-			sp, err := packets.NewSubscribePacket(fh, b)
+			sp, err := packets.NewSubscribePacket(p)
 			if err != nil {
 				log.Println(err)
 			}
@@ -191,38 +189,24 @@ func (mqtt *MQTT) HandleConnection(c *Connection) {
 	}
 }
 
-func (c *Connection) PublishQos(rc chan uint16) {
-	b := make([]byte, 4)
-	for {
-		_, err := c.Conn.Read(b)
-		if err != nil {
-			log.Println("Connection read error")
-			return
-		}
-		fh, err := packets.NewFixedHeader(b)
-		if fh.Type == 6 {
-			pr, err := packets.NewPublishQoSPacket(fh, b)
-			if err != nil {
-				log.Println("Bad publish QoS Packet Provided")
-			}
-			rc <- pr.PacketIdentifier.PacketIdentifier
-		}
-	}
-}
-
-func (c *Connection) ProcessFixedHeader() (fh *packets.FixedHeader, b []byte, err error) {
-	b = make([]byte, 2)
-	_, err = c.Conn.Read(b)
-	fh, err = packets.NewFixedHeader(b)
-	if err != nil {
-		log.Println(err)
-	}
-
-	// Reading only the length of the packet
-	b = make([]byte, fh.RemaningLength)
-	_, err = c.Conn.Read(b)
-	return
-}
+// func (c *Connection) PublishQos(rc chan uint16) {
+// 	b := make([]byte, 4)
+// 	for {
+// 		_, err := c.Conn.Read(b)
+// 		if err != nil {
+// 			log.Println("Connection read error")
+// 			return
+// 		}
+// 		fh, err := packets.NewFixedHeader(b)
+// 		if fh.Type == 6 {
+// 			pr, err := packets.NewPublishQoSPacket(fh, b)
+// 			if err != nil {
+// 				log.Println("Bad publish QoS Packet Provided")
+// 			}
+// 			rc <- pr.PacketIdentifier.PacketIdentifier
+// 		}
+// 	}
+// }
 
 // TODO
 // Improve Networking

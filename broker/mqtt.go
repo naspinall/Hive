@@ -14,7 +14,7 @@ const (
 )
 
 func main() {
-	mqtt := server.NewMQTTBroker(nil)
+	mqtt := server.NewMQTTBroker()
 	mqtt.Publish("hello", func(pp *packets.PublishPacket) {
 		//fmt.Println(string(pp.Payload))
 	})
