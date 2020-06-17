@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/naspinall/Hive/pkg/graphql"
+
 	"github.com/naspinall/Hive/pkg/config"
 	"github.com/naspinall/Hive/pkg/middleware"
 
@@ -33,14 +35,18 @@ func main() {
 		log.Fatal(err)
 	}
 	defer services.Close()
-	services.DestructiveReset()
 	services.AutoMigrate()
 
+	// REST Controllers
 	usersC := controllers.NewUsers(services.User, services.RBAC)
 	devicesC := controllers.NewDevices(services.Device)
 	measurementsC := controllers.NewMeasurements(services.Measurement)
 	alarmsC := controllers.NewAlarms(services.Alarm)
 	subscriptionsC := controllers.NewSubscriptions(services.Subscription)
+
+	// Graphql Resolvers
+	deviceR := graphql.NewDeviceResolver(services.Device)
+
 	userM := middleware.NewUsersMiddleware(services.User)
 	auth := userM.JWTAuth()
 
@@ -93,6 +99,10 @@ func main() {
 	s.HandleFunc("/{id}/", subscriptionsC.Create).Methods("POST")
 	s.HandleFunc("/{id}/", subscriptionsC.Delete).Methods("DELETE")
 	s.HandleFunc("/", subscriptionsC.GetMany).Methods("GET")
+
+	g := r.PathPrefix("/graphql").Subrouter().StrictSlash(true)
+	g.Use(auth)
+	g.HandleFunc("/devices", deviceR.HandleQuery)
 
 	//Roles CRUD
 	log.Println(fmt.Sprintf("Listening on port %d", cfg.Port))

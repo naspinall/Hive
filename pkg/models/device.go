@@ -39,6 +39,7 @@ type DeviceDB interface {
 	ByID(id uint, ctx context.Context) (*Device, error)
 	SearchByName(name string, ctx context.Context) ([]*Device, error)
 	Many(count int, ctx context.Context) ([]*Device, error)
+	Count(ctx context.Context) (uint, error)
 
 	//Mutators
 	Create(device *Device, ctx context.Context) error
@@ -117,6 +118,17 @@ func (dg *deviceGorm) ByName(name string, ctx context.Context) (*Device, error) 
 	}
 
 	return &device, nil
+}
+
+func (dg *deviceGorm) Count(ctx context.Context) (uint, error) {
+	var count uint
+	//Getting Device from database.
+	err := dg.db.Find(&Device{}).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 func (dg *deviceGorm) ByID(id uint, ctx context.Context) (*Device, error) {

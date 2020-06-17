@@ -19,7 +19,7 @@ for x in range(0, 25):
                 "IMEI": str(random.randint(1, 999999999999999)),
                 "latitude": -random.uniform(0.001, 0.000001) + place["latitude"],
                 "longitude": random.uniform(0.001, 0.000001) + place["longitude"],
-            },headers={"Authorization": "Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImV4cCI6MTU4OTcxODY4MCwiaXNzIjoiSGl2ZSJ9.yJqm9wF0o5ju3YE7k-GM1Oi6YliMPOIk-8mRmcjz-4XEtxgcl4HgkImVt9pAJ4LLvLAL_OsWFk8OsIZgbuHicA"}
+            },headers={"Authorization": "Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImV4cCI6MTYyNjM4OTUxNywiaXNzIjoiSGl2ZSIsInJvbGUiOnsiSUQiOjEsIkNyZWF0ZWRBdCI6IjIwMjAtMDUtMjVUMDY6NDY6MTYuNTU5NDc1WiIsIlVwZGF0ZWRBdCI6IjIwMjAtMDUtMjVUMDY6NTA6NTUuNDI2ODMzWiIsIkRlbGV0ZWRBdCI6bnVsbCwiYWxhcm1zIjo0LCJ1c2VycyI6NCwibWVhc3VyZW1lbnRzIjo0LCJkZXZpY2VzIjo0LCJzdWJzY3JpcHRpb25zIjo0LCJ1c2VySUQiOjF9fQ.Vo1vRyBywQWcO6KWWm-CdPa3Mdarsqk0l5A_KJC-PF9FplC8Jg7hglbIIaEfqInGYU64bKHxPudveHYASvwltQ"}
         )
 
 # for x in range(0, 100):
