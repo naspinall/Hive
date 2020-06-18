@@ -3,7 +3,7 @@ package packets
 import "bytes"
 
 type PingPacket struct {
-	*Packet
+	Packet
 }
 
 func NewPingPacket() *PingPacket {
@@ -16,7 +16,7 @@ func (prp PingPacket) Encode() ([]byte, error) {
 
 func PingRequest() *PingPacket {
 	return &PingPacket{
-		Packet: &Packet{
+		Packet{
 			Type:           12,
 			RemaningLength: 0,
 			buff:           &bytes.Buffer{},
@@ -26,7 +26,7 @@ func PingRequest() *PingPacket {
 
 func PingResponse() *PingPacket {
 	return &PingPacket{
-		Packet: &Packet{
+		Packet{
 			Type:           13,
 			RemaningLength: 0,
 			buff:           &bytes.Buffer{},

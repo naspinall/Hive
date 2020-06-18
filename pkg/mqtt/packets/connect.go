@@ -13,7 +13,7 @@ type WillProperties struct {
 }
 
 type ConnectPacket struct {
-	*Packet
+	Packet
 	//Variable Header
 	ProtocolName    string
 	ProtocolVersion byte
@@ -48,7 +48,7 @@ type ConnectPacket struct {
 }
 
 type ConnackPacket struct {
-	*Packet
+	Packet
 	SessionPresent byte
 	ReturnCode     byte
 }
@@ -64,13 +64,13 @@ func NewConnackPacket(b []byte) (*ConnackPacket, error) {
 		return nil, err
 	}
 
-	return &ConnackPacket{Packet: p, ReturnCode: rc}, nil
+	return &ConnackPacket{Packet: *p, ReturnCode: rc}, nil
 
 }
 
 func NewConnectPacket(p *Packet) (*ConnectPacket, error) {
 	cp := &ConnectPacket{
-		Packet: p,
+		Packet: *p,
 	}
 
 	err := cp.DecodeProtocolVersion()
@@ -206,7 +206,7 @@ func (cp ConnectPacket) DecodeWillTopic() error {
 }
 
 func (cp ConnectPacket) DecodeWillMessage() error {
-	cp.WillPayload = cp.DecodeBinaryData()
+	//cp.WillPayload = cp.DecodeBinaryData() // TODO Implement this
 	return nil
 }
 
@@ -216,7 +216,7 @@ func (cp ConnectPacket) DecodeUsername() error {
 }
 
 func (cp ConnectPacket) DecodePassword() error {
-	cp.Password = cp.DecodeBinaryData()
+	//cp.Password = cp.DecodeBinaryData() // TODO Implement this
 	return nil
 }
 
@@ -280,7 +280,7 @@ func Accepted() ConnackPacket {
 	}
 
 	return ConnackPacket{
-		Packet:         p,
+		Packet:         *p,
 		SessionPresent: 1,
 		ReturnCode:     ConnectionAccepted,
 	}
@@ -291,7 +291,7 @@ func BadProtocolVersion() ConnackPacket {
 		Type:           CONNACK,
 		buff:           &bytes.Buffer{},
 	}
-	return ConnackPacket{Packet: p,
+	return ConnackPacket{Packet: *p,
 		SessionPresent: 0,
 		ReturnCode:     UnnaceptableProtocolVersion,
 	}
@@ -303,7 +303,7 @@ func InvalidIdentifier() ConnackPacket {
 		Type:           CONNACK,
 		buff:           &bytes.Buffer{},
 	}
-	return ConnackPacket{Packet: p,
+	return ConnackPacket{Packet: *p,
 		SessionPresent: 0,
 		ReturnCode:     IdentifierRejected,
 	}
@@ -314,7 +314,7 @@ func ServiceUnavailable() ConnackPacket {
 		Type:           CONNACK,
 		buff:           &bytes.Buffer{},
 	}
-	return ConnackPacket{Packet: p,
+	return ConnackPacket{Packet: *p,
 		SessionPresent: 0,
 		ReturnCode:     ServerUnavailable,
 	}
@@ -325,7 +325,7 @@ func BadAuth() ConnackPacket {
 		Type:           CONNACK,
 		buff:           &bytes.Buffer{},
 	}
-	return ConnackPacket{Packet: p,
+	return ConnackPacket{Packet: *p,
 		SessionPresent: 0,
 		ReturnCode:     BadUsernameOrPassword,
 	}
@@ -336,7 +336,7 @@ func NotAuth() ConnackPacket {
 		Type:           CONNACK,
 		buff:           &bytes.Buffer{},
 	}
-	return ConnackPacket{Packet: p,
+	return ConnackPacket{Packet: *p,
 		SessionPresent: 0,
 		ReturnCode:     NotAuthorised,
 	}

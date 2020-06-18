@@ -1,22 +1,24 @@
 package packets
 
-import "bytes"
+import (
+	"bytes"
+)
 
 type PublishPacket struct {
-	*Packet
+	Packet
 	TopicName        string
 	PacketIdentifier uint16
 	Payload          []byte
 }
 
 type PublishQoSPacket struct {
-	*Packet
+	Packet
 	PacketIdentifier
 }
 
 func NewPublishQoSPacket(p *Packet) (*PublishQoSPacket, error) {
 	pqp := &PublishQoSPacket{
-		Packet: p,
+		Packet: *p,
 	}
 	err := pqp.DecodePacketIdentifier()
 	if err != nil {
@@ -27,19 +29,22 @@ func NewPublishQoSPacket(p *Packet) (*PublishQoSPacket, error) {
 
 func NewPublishPacket(p *Packet) (*PublishPacket, error) {
 	pp := &PublishPacket{
-		Packet: p,
+		Packet: *p,
 	}
+
 	err := pp.DecodeTopicName()
 	if err != nil {
 		return nil, err
 	}
 
-	err = pp.DecodePacketIdentifier()
-	if err != nil {
-		return nil, err
+	if pp.Flags.QoS > 0 {
+		err = pp.DecodePacketIdentifier()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	pp.Payload = pp.DecodeBinaryData()
+	pp.Payload = pp.buff.Next(pp.buff.Len())
 	return pp, nil
 }
 
@@ -72,9 +77,12 @@ func (pp *PublishPacket) Encode() ([]byte, error) {
 	if err := pp.EncodeTopicName(); err != nil {
 		return nil, err
 	}
-	// Packet identifier next
-	if err := pp.EncodePacketIdentifier(); err != nil {
-		return nil, err
+
+	if pp.Flags.QoS > 0 {
+		// Packet identifier next
+		if err := pp.EncodePacketIdentifier(); err != nil {
+			return nil, err
+		}
 	}
 
 	pp.EncodeBinary(pp.Payload)
@@ -88,7 +96,7 @@ func (pq *PublishQoSPacket) Encode() ([]byte, error) {
 
 func Acknowledge(i uint16) *PublishQoSPacket {
 	return &PublishQoSPacket{
-		Packet: &Packet{
+		Packet: Packet{
 			Type:           4,
 			RemaningLength: 2,
 			buff:           &bytes.Buffer{},
@@ -102,7 +110,7 @@ func Acknowledge(i uint16) *PublishQoSPacket {
 
 func Received(i uint16) *PublishQoSPacket {
 	return &PublishQoSPacket{
-		Packet: &Packet{
+		Packet: Packet{
 			Type:           5,
 			RemaningLength: 2,
 			buff:           &bytes.Buffer{},
@@ -116,7 +124,7 @@ func Received(i uint16) *PublishQoSPacket {
 
 func Complete(i uint16) *PublishQoSPacket {
 	return &PublishQoSPacket{
-		Packet: &Packet{
+		Packet: Packet{
 			Type:           6,
 			RemaningLength: 2,
 			buff:           &bytes.Buffer{},

@@ -1,12 +1,15 @@
 package packets
 
+import (
+	"bytes"
+)
+
 type Topic struct {
 	Topic string
 	QoS   byte
 }
 
 type SubscribePacket struct {
-	*Packet
 	PacketIdentifier
 
 	//Payload Properties
@@ -14,14 +17,15 @@ type SubscribePacket struct {
 }
 
 type SubAckPacket struct {
-	*Packet
 	PacketIdentifier
 	ReturnCode byte
 }
 
 func NewSubAckPacket(p *Packet) (*SubAckPacket, error) {
 	sap := &SubAckPacket{
-		Packet: p,
+		PacketIdentifier: PacketIdentifier{
+			Packet: *p,
+		},
 	}
 	err := sap.DecodePacketIdentifier()
 	if err != nil {
@@ -34,7 +38,9 @@ func NewSubAckPacket(p *Packet) (*SubAckPacket, error) {
 
 func NewSubscribePacket(p *Packet) (*SubscribePacket, error) {
 	sp := &SubscribePacket{
-		Packet: p,
+		PacketIdentifier: PacketIdentifier{
+			Packet: *p,
+		},
 	}
 	err := sp.DecodePacketIdentifier()
 	if err = sp.DecodeTopics(); err != nil {
@@ -44,9 +50,15 @@ func NewSubscribePacket(p *Packet) (*SubscribePacket, error) {
 }
 
 func (sp *SubscribePacket) DecodeTopics() error {
+	var i int
+	topicsLen := sp.Packet.RemaningLength - 2
 	// Reconsider this.
-	for sp.buff.Len() > 0 {
-		topic := sp.DecodeString()
+	for i < topicsLen {
+
+		length := sp.DecodeTwoByteInt()
+		b := sp.buff.Next(int(length))
+
+		topic := string(b)
 		qos, err := sp.DecodeByte()
 		if err != nil {
 			return err
@@ -55,6 +67,8 @@ func (sp *SubscribePacket) DecodeTopics() error {
 			Topic: topic,
 			QoS:   qos,
 		})
+		i += int(length + 1)
+
 	}
 
 	return nil
@@ -97,13 +111,23 @@ func (sp *SubAckPacket) Encode() ([]byte, error) {
 		return nil, err
 	}
 
-	if err := sp.EncodePacketIdentifier(); err != nil {
-		return nil, err
-	}
-
 	if err := sp.EncodeByte(sp.ReturnCode); err != nil {
 		return nil, err
 	}
 
 	return sp.EncodeFixedHeader()
+}
+
+func SubAck(packetIdentifier uint16, rc byte) *SubAckPacket {
+	p := &Packet{
+		buff:           &bytes.Buffer{},
+		Type:           SUBACK,
+		RemaningLength: 3,
+	}
+	return &SubAckPacket{
+		PacketIdentifier: PacketIdentifier{
+			Packet:           *p,
+			PacketIdentifier: packetIdentifier,
+		},
+	}
 }

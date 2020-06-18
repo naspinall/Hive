@@ -38,7 +38,7 @@ const (
 )
 
 type PacketIdentifier struct {
-	*Packet
+	Packet
 	PacketIdentifier uint16
 }
 
@@ -70,41 +70,41 @@ type Packet struct {
 	buff           *bytes.Buffer
 }
 
-func FromReader(reader io.Reader) (*Packet, error) {
-	b := make([]byte, 2)
-	n, err := io.ReadFull(reader, b)
-	if err != nil || n != 2 {
-		if n != 2 {
-			return nil, errors.New("Bad inital read")
-		}
+// Gets how many bytes the remaining length has taken
+func (p *Packet) RemainingLengthByteLength() int {
+	if p.RemaningLength < 128 {
+		return 1
+	} else if p.RemaningLength < 16384 {
+		return 2
+	} else if p.RemaningLength < 2097152 {
+		return 3
+	} else {
+		return 4
+	}
+}
 
+func FromReader(reader io.Reader) (*Packet, error) {
+	b := make([]byte, 5)
+	_, err := reader.Read(b) // TOOD Bad Packet Read
+
+	Type, Flags := DecodeTypeAndFlags(b[0])
+	rl, err := DecodeVariableByteInteger(b[1:])
+
+	if err != nil {
 		return nil, err
 	}
 
 	p := &Packet{
-		buff: bytes.NewBuffer(b),
+		Type:           Type,
+		Flags:          Flags,
+		RemaningLength: rl,
 	}
 
-	if err := p.DecodeTypeAndFlags(); err != nil {
-		return nil, err
-	}
-
-	if err := p.DecodeRemainingLength(); err != nil {
-		return nil, err
-	}
-
-	b = make([]byte, p.RemaningLength)
-	if n, err := io.ReadFull(reader, b); err != nil || n != p.RemaningLength {
-		if n != p.RemaningLength {
-			err = errors.New("Bad Length")
-		}
-		return nil, err
-	}
-
-	n, err = p.buff.Write(b)
-	if err != nil || n != p.RemaningLength {
-		return nil, errors.New("Buffer write")
-	}
+	offset := 5 - p.RemainingLengthByteLength()
+	buff := make([]byte, p.RemaningLength-offset)
+	// Getting bytes from the start of the
+	buff = append(b[offset:], buff...)
+	p.buff = bytes.NewBuffer(buff)
 
 	return p, nil
 }
@@ -153,6 +153,15 @@ func (p *Packet) DecodeTypeAndFlags() error {
 	return nil
 }
 
+func DecodeTypeAndFlags(b byte) (byte, FixedHeaderFlags) {
+	Type := b >> 4
+	Flags := FixedHeaderFlags{}
+	Flags.Duplicate = (b >> 3 & 0x01) > 0
+	Flags.QoS = uint8(b >> 1 & 0x03)
+	Flags.Retain = b&0x01 > 0
+	return Type, Flags
+}
+
 func (p *Packet) DecodeVariableByteInteger() (int, error) {
 	m := 1
 	v := 0
@@ -163,6 +172,26 @@ func (p *Packet) DecodeVariableByteInteger() (int, error) {
 		if err != nil {
 			return 0, err
 		}
+		v += (int(eb) & 0x7F) * m
+		m *= 128
+		if m > 128*128*128 {
+			return -1, errors.New("Malformed byte")
+		}
+		n++
+		if eb&0x80 == 0 {
+			break
+		}
+	}
+
+	return v, nil
+}
+
+func DecodeVariableByteInteger(b []byte) (int, error) {
+	m := 1
+	v := 0
+	n := 0
+	for _, eb := range b {
+
 		v += (int(eb) & 0x7F) * m
 		m *= 128
 		if m > 128*128*128 {
@@ -197,9 +226,8 @@ func (p *Packet) DecodeString() string {
 	return string(b)
 }
 
-func (p *Packet) DecodeBinaryData() []byte {
-	length := p.DecodeTwoByteInt()
-	return p.buff.Next(int(length))
+func (p *Packet) DecodeBinaryData(length int) []byte {
+	return p.buff.Next(length)
 }
 
 func (p *Packet) DecodeStringPair() *StringPair {
@@ -249,7 +277,7 @@ func (p *Packet) EncodeTwoByteInt(ni uint16) error {
 }
 
 func (p *Packet) EncodeString(ns string) error {
-	stringBytes := bytes.NewBufferString(ns).Bytes()
+	stringBytes := []byte(ns)
 	length := uint16(len(stringBytes))
 	p.EncodeTwoByteInt(length)
 	_, err := p.buff.Write(stringBytes)

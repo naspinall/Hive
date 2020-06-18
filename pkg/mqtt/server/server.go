@@ -7,17 +7,17 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/naspinall/Hive/pkg/mqtt/client"
 	"github.com/naspinall/Hive/pkg/mqtt/packets"
 )
 
 func NewMQTTBroker() MQTT {
 	return MQTT{
-		SubscriptionHandlers: make(map[string]SubscribeHandler),
-		PublishHandlers:      make(map[string]PublishHandler),
 		// Default Auth handler
 		AuthHandler: func(b []byte) (bool, error) {
 			return true, nil
 		},
+		Subscriptions: make(map[string][]*Connection),
 	}
 }
 
@@ -25,9 +25,8 @@ type PublishHandler func(*packets.PublishPacket)
 type SubscribeHandler func(*packets.SubscribePacket, *Connection)
 
 type MQTT struct {
-	SubscriptionHandlers map[string]SubscribeHandler
-	PublishHandlers      map[string]PublishHandler
-	AuthHandler          func(b []byte) (bool, error)
+	Subscriptions map[string][]*Connection
+	AuthHandler   func(b []byte) (bool, error)
 }
 
 func (mqtt *MQTT) Listen(host string, port string) {
@@ -46,18 +45,41 @@ func (mqtt *MQTT) Listen(host string, port string) {
 	}
 }
 
-func (mqtt *MQTT) Publish(topic string, handler PublishHandler) {
-	mqtt.PublishHandlers[topic] = handler
+func (mqtt *MQTT) HandlePublish(pp *packets.PublishPacket) error {
+
+	sessions, ok := mqtt.Subscriptions[pp.TopicName]
+
+	if ok {
+		for _, session := range sessions {
+			fmt.Printf("Sending for topic %s", pp.TopicName)
+			err := client.Publish(pp, session.Conn)
+			// One error shouldn't break all of the publishes.
+			if err != nil {
+				log.Println(err)
+			}
+		}
+	}
+	return nil
 }
 
-func (mqtt *MQTT) Subscribe(topic string, handler SubscribeHandler) {
-	mqtt.SubscriptionHandlers[topic] = handler
+func (mqtt *MQTT) HandleSubscribe(pp *packets.SubscribePacket, c *Connection) {
+
+	for _, topic := range pp.Topics {
+		// If subscription alreay exists we'll add to the curernt list of connections
+		current, ok := mqtt.Subscriptions[topic.Topic]
+		if ok {
+			current = append(current, c)
+			continue
+		}
+		fmt.Printf("%+v", mqtt.Subscriptions[topic.Topic])
+		mqtt.Subscriptions[topic.Topic] = []*Connection{c}
+	}
+
+	client.SubAck(pp.PacketIdentifier.PacketIdentifier, 0, c.Conn)
 }
 
 func (mqtt *MQTT) HandleNewConn(conn net.Conn) {
-	b := make([]byte, 4096)
-	_, err := conn.Read(b)
-	p, err := packets.NewMQTTPacket(b)
+	p, err := packets.FromReader(conn)
 	if err != nil {
 		log.Println(err)
 		conn.Close()
@@ -113,29 +135,37 @@ func (mqtt *MQTT) NewConnection(conn net.Conn, deviceID uint) (*Connection, erro
 func (mqtt *MQTT) HandleConnection(c *Connection) {
 	for {
 		b := make([]byte, 4096)
-		_, err := c.Conn.Read(b)
+		n, err := c.Conn.Read(b)
+		if n == 0 {
+			continue
+		}
 		p, err := packets.NewMQTTPacket(b)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
+
 		switch p.Type {
 		case packets.PUBLISH:
 			pp, err := packets.NewPublishPacket(p)
 			if err != nil {
 				log.Println(err)
+				break
 			}
+			mqtt.HandlePublish(pp)
 			switch pp.Flags.QoS {
 			case 1:
 				b, err := packets.Acknowledge(pp.PacketIdentifier).Encode()
 				if err != nil {
 					log.Println("Back Ack packet encoding")
+					break
 				}
 				c.Conn.Write(b)
 			case 2:
 				b, err := packets.Received(pp.PacketIdentifier).Encode()
 				if err != nil {
 					log.Println("Back Ack packet encoding")
+					break
 				}
 				c.Conn.Write(b)
 				rc := make(chan uint16)
@@ -153,22 +183,15 @@ func (mqtt *MQTT) HandleConnection(c *Connection) {
 					continue
 				}
 			}
-			// Support for wildcards and multilevel coming soon
-			if handler, ok := mqtt.PublishHandlers[pp.TopicName]; ok == true {
-				handler(pp)
-			}
 
 		case packets.SUBSCRIBE:
 			sp, err := packets.NewSubscribePacket(p)
 			if err != nil {
 				log.Println(err)
+				break
 			}
-			// Support for wildcards and multilevel coming soon
-			for _, topic := range sp.Topics {
-				if handler, ok := mqtt.SubscriptionHandlers[topic.Topic]; ok == true {
-					go handler(sp, c)
-				}
-			}
+			fmt.Println("Subsribe me!")
+			mqtt.HandleSubscribe(sp, c)
 		case packets.UNSUBSCRIBE:
 			continue
 		case packets.PINGREQ:
@@ -176,6 +199,7 @@ func (mqtt *MQTT) HandleConnection(c *Connection) {
 			pr, err := packets.PingResponse().Encode()
 			if err != nil {
 				log.Println(err)
+				break
 			}
 			c.Conn.Write(pr)
 			log.Println("PONG -->")

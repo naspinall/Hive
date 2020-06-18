@@ -1,11 +1,11 @@
 package packets
 
 type DisconnectPacket struct {
-	*Packet
+	Packet
 }
 
 func NewDisconnectPacket(p *Packet) (*DisconnectPacket, error) {
-	dp := &DisconnectPacket{p}
+	dp := &DisconnectPacket{*p}
 	return dp, nil
 }
 

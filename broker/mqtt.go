@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/naspinall/Hive/pkg/mqtt/packets"
 	"github.com/naspinall/Hive/pkg/mqtt/server"
 )
 
@@ -15,8 +14,5 @@ const (
 
 func main() {
 	mqtt := server.NewMQTTBroker()
-	mqtt.Publish("hello", func(pp *packets.PublishPacket) {
-		//fmt.Println(string(pp.Payload))
-	})
 	mqtt.Listen("localhost", "8080")
 }
