@@ -6,18 +6,40 @@ import (
 	"net"
 	"time"
 
+	"github.com/naspinall/Hive/pkg/config"
+
 	"github.com/google/uuid"
+	_ "github.com/joho/godotenv/autoload"
 	"github.com/naspinall/Hive/pkg/mqtt/client"
+	"github.com/naspinall/Hive/pkg/mqtt/models"
 	"github.com/naspinall/Hive/pkg/mqtt/packets"
 )
 
 func NewMQTTBroker() MQTT {
+	pc := config.LoadFromEnvironment()
+
+	services, err := models.NewServices(
+		models.WithGorm("postgres", pc.ConnectionInfo()),
+		models.WithRetain(),
+		models.WithSession(),
+		models.WithWill(),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = services.AutoMigrate()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return MQTT{
 		// Default Auth handler
 		AuthHandler: func(b []byte) (bool, error) {
 			return true, nil
 		},
 		Subscriptions: make(map[string][]*Connection),
+		Services:      *services,
 	}
 }
 
@@ -25,6 +47,7 @@ type PublishHandler func(*packets.PublishPacket)
 type SubscribeHandler func(*packets.SubscribePacket, *Connection)
 
 type MQTT struct {
+	models.Services
 	Subscriptions map[string][]*Connection
 	AuthHandler   func(b []byte) (bool, error)
 }
@@ -122,11 +145,8 @@ func (mqtt *MQTT) HandleNewConn(conn net.Conn) {
 
 func (mqtt *MQTT) NewConnection(conn net.Conn, deviceID uint) (*Connection, error) {
 	c := &Connection{
-		Session: &Session{
-			SessionID: uuid.New().String(),
-			DeviceID:  deviceID,
-		},
-		Conn: conn,
+		ClientID: uuid.New().String(),
+		Conn:     conn,
 	}
 
 	return c, nil
@@ -134,14 +154,10 @@ func (mqtt *MQTT) NewConnection(conn net.Conn, deviceID uint) (*Connection, erro
 
 func (mqtt *MQTT) HandleConnection(c *Connection) {
 	for {
-		b := make([]byte, 4096)
-		n, err := c.Conn.Read(b)
-		if n == 0 {
-			continue
-		}
-		p, err := packets.NewMQTTPacket(b)
+		p, err := packets.FromReader(c.Conn)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Bad packet read")
+			c.Conn.Close()
 			return
 		}
 

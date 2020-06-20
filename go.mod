@@ -12,6 +12,7 @@ require (
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/jinzhu/gorm v1.9.11
+	github.com/joho/godotenv v1.3.0
 	github.com/lib/pq v1.2.0 // indirect
 	github.com/neelance/parallel v0.0.0-20160708114440-4de9ce63d14c // indirect
 	github.com/opentracing/basictracer-go v1.0.0 // indirect

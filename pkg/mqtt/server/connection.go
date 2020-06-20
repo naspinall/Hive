@@ -5,6 +5,6 @@ import (
 )
 
 type Connection struct {
-	Session *Session
-	Conn    net.Conn
+	ClientID string
+	Conn     net.Conn
 }

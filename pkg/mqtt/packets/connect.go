@@ -173,7 +173,7 @@ func (cp ConnectPacket) DecodePayload() error {
 	if err != nil {
 		return err
 	}
-	// If willflag is set to 1, fill topic is the next in the payload.
+	// If willflag is set to 1, will topic is the next in the payload.
 	if cp.WillFlag {
 		err = cp.DecodeWillTopic()
 		if err != nil {
