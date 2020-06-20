@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 )
 
 type PostgresConfig struct {
@@ -57,6 +58,20 @@ func DefaultConfig() Config {
 		JWTKey:   "jwt-make-life-easy",
 		Database: DefaultPostgresConfig(),
 	}
+}
+
+// Load from environment variables
+func LoadFromEnvironment() (pc PostgresConfig) {
+	port, err := strconv.Atoi(os.Getenv("POSTGRES_PORT"))
+	if err != nil {
+		pc.Port = 5432
+	}
+	pc.Host = os.Getenv("POSTGRES_HOST")
+	pc.Port = port
+	pc.User = os.Getenv("POSTGRES_USER")
+	pc.Password = os.Getenv("POSTGRES_PASSWORD")
+	pc.Name = os.Getenv("POSTGRES_DB")
+	return
 }
 
 func LoadConfig() (c Config) {
