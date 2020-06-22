@@ -66,12 +66,18 @@ func LoadFromEnvironment() (pc PostgresConfig) {
 	if err != nil {
 		pc.Port = 5432
 	}
-	pc.Host = os.Getenv("POSTGRES_HOST")
-	pc.Port = port
-	pc.User = os.Getenv("POSTGRES_USER")
-	pc.Password = os.Getenv("POSTGRES_PASSWORD")
-	pc.Name = os.Getenv("POSTGRES_DB")
-	return
+	host := os.Getenv("POSTGRES_HOST")
+	user := os.Getenv("POSTGRES_USER")
+	password := os.Getenv("POSTGRES_PASSWORD")
+	name := os.Getenv("POSTGRES_DB")
+
+	return PostgresConfig{
+		Host:     host,
+		Port:     port,
+		User:     user,
+		Password: password,
+		Name:     name,
+	}
 }
 
 func LoadConfig() (c Config) {
